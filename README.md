@@ -48,3 +48,4 @@ These defaults can be changed in `backend/.env` (`OFFICE_START_TIME`, `LATE_GRAC
 - This starter uses a configurable leave allowance on each employee record. It does not assume a country's statutory leave entitlement. Admins can configure the allowance.
 - The sample implementation uses browser GPS and photo capture; it does not prove physical presence or prevent GPS spoofing. Consider office geofencing and device/risk checks for production.
 # Attendify-HR
+# Attendify-HR
