@@ -1,0 +1,73 @@
+{
+"$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+"version": 1,
+"newProjectRoot": "projects",
+"projects": {
+  "attendify": {
+    "projectType": "application",
+    "schematics": {},
+    "root": "",
+    "sourceRoot": "src",
+    "prefix": "app",
+    "architect": {
+      "build": {
+        "builder": "@angular-devkit/build-angular:browser",
+        "options": {
+          "outputPath": "dist/attendify-hr",
+          "index": "src/index.html",
+          "main": "src/main.ts",
+          "polyfills": [
+            "zone.js"
+          ],
+          "tsConfig": "tsconfig.app.json",
+          "inlineStyleLanguage": "css",
+          "assets": [
+            "src/assets"
+          ],
+          "styles": [
+            "node_modules/bootstrap/dist/css/bootstrap.min.css",
+            "src/styles.css"
+          ],
+          "scripts": []
+        },
+        "configurations": {
+          "production": {
+            "budgets": [
+              {
+                "type": "initial",
+                "maximumWarning": "2mb",
+                "maximumError": "5mb"
+              }
+            ],
+            "outputHashing": "all"
+          },
+          "development": {
+            "buildOptimizer": false,
+            "optimization": false,
+            "vendorChunk": true,
+            "extractLicenses": false,
+            "sourceMap": true
+          }
+        },
+        "defaultConfiguration": "development"
+      },
+      "serve": {
+        "builder": "@angular-devkit/build-angular:dev-server",
+        "configurations": {
+          "production": {
+            "browserTarget": "attendify:build:production"
+          },
+          "development": {
+            "browserTarget": "attendify:build:development"
+          }
+        },
+        "defaultConfiguration": "development"
+      }
+    }
+  }
+},
+"defaultProject": "attendify",
+"cli": {
+  "analytics": "944ba938-6ee4-4043-932a-3c49b0dad928"
+}
+}

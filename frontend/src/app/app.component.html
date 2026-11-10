@@ -1,0 +1,1036 @@
+<div *ngIf="!user" class="login-shell">
+  <div class="login-art">
+    <div class="brand">
+      <span class="brand-icon"><i class="fa-solid fa-fingerprint"></i></span> Attendify<span>HR</span>
+    </div>
+    <div class="login-copy"><span class="eyebrow">SMART PEOPLE. SMARTER WORK.</span>
+      <h1>Every moment<br><em>counts.</em></h1>
+      <p>A simpler way to manage attendance, people and time off — all in one beautiful workspace.</p>
+      <button class="nav-link" [class.active]="page==='settings'" (click)="changePage('settings')">
+
+        <i class="fa-solid fa-gear"></i>
+        Profile & Settings
+
+      </button>
+      <div class="login-points">
+        <span><i class="fa-solid fa-location-dot"></i> Location verified</span>
+        <span><i class="fa-solid fa-shield-halved"></i> Secure records</span>
+        <span><i class="fa-solid fa-calendar-check"></i>Leave tracking</span>
+      </div>
+    </div>
+    <div class="art-orb orb-one"></div>
+    <div class="art-orb orb-two"></div>
+  </div>
+  <div class="login-panel">
+    <div class="login-card">
+      <div class="mobile-brand brand"><span class="brand-icon"><i class="fa-solid fa-fingerprint"></i></span>
+        Attendify<span>HR</span></div>
+      <div class="eyebrow">WELCOME BACK</div>
+      <h2>Sign in to your account</h2>
+      <p class="muted">Enter your details to access your workspace.</p>
+      <form (ngSubmit)="login()"><label>Email address</label>
+        <div class="input-wrap"><i class="fa-regular fa-envelope"></i><input type="email" name="email"
+            [(ngModel)]="loginForm.email" placeholder="name@company.com" required></div><label>Password</label>
+        <div class="input-wrap"><i class="fa-solid fa-lock"></i><input type="password" name="password"
+            [(ngModel)]="loginForm.password" placeholder="Enter your password" required></div><button
+          class="primary-btn w-100" [disabled]="busy">{{busy?'Signing in...':'Sign in'}} <i
+            class="fa-solid fa-arrow-right"></i></button>
+      </form>
+
+      <!-- <div class="demo-box"><b>Demo accounts</b>
+        <div>Admin: admin@attendify.local / Admin@12345</div>
+        <div>Employee: employee@attendify.local / Employee@12345</div>
+      </div> -->
+      <small class="muted">By continuing, you agree to your organization's attendance and privacy policy.</small>
+    </div>
+  </div>
+</div>
+<div *ngIf="user" class="app-shell">
+  <aside class="sidebar" [class.sidebar-admin]="isAdmin">
+    <div class="brand"><span class="brand-icon"><i class="fa-solid fa-fingerprint"></i></span> Attendify<span>HR</span>
+    </div>
+    <div class="workspace-label">WORKSPACE</div>
+    <button class="nav-link" [class.active]="page==='dashboard'" (click)="changePage('dashboard')"><i
+        class="fa-solid fa-grip"></i> Dashboard</button>
+    <ng-container *ngIf="!isAdmin">
+      <div class="workspace-label mt-4">MY WORK</div><button class="nav-link" [class.active]="page==='attendance'"
+        (click)="changePage('attendance')"><i class="fa-regular fa-clock"></i> Attendance</button><button
+        class="nav-link" [class.active]="page==='leaves'" (click)="changePage('leaves')"><i
+          class="fa-regular fa-calendar"></i> My Leaves</button><button class="nav-link"
+        [class.active]="page==='history'" (click)="changePage('history')"><i class="fa-solid fa-list-check"></i>
+        Attendance History</button>
+    </ng-container>
+    <ng-container *ngIf="isAdmin">
+      <div class="workspace-label mt-4">MANAGEMENT</div><button class="nav-link" [class.active]="page==='employees'"
+        (click)="changePage('employees')"><i class="fa-solid fa-users"></i> Employees</button><button class="nav-link"
+        [class.active]="page==='admin-attendance'" (click)="changePage('admin-attendance')"><i
+          class="fa-regular fa-calendar-check"></i> Attendance</button><button class="nav-link"
+        [class.active]="page==='admin-leaves'" (click)="changePage('admin-leaves')"><i
+          class="fa-regular fa-envelope"></i> Leave Requests <span class="nav-count"
+          *ngIf="pendingLeaves">{{pendingLeaves}}</span></button>
+    </ng-container>
+    <div class="sidebar-bottom">
+      <div class="help-card"><i class="fa-regular fa-circle-question"></i><b>Need a hand?</b><small>Reach out to your HR
+          administrator.</small></div><button class="nav-link logout" (click)="logout()"><i
+          class="fa-solid fa-arrow-right-from-bracket"></i> Sign out</button>
+    </div>
+  </aside>
+  <main class="main-area">
+    <header class="topbar">
+      <div>
+        <div class="breadcrumb">Workspace <i class="fa-solid fa-chevron-right"></i> <b>{{page.replace('-',' ') |
+            titlecase}}</b></div>
+        <h2>{{page==='dashboard'?'Overview':page.replace('-',' ') | titlecase}}</h2>
+      </div>
+      <div class="top-actions">
+        <div class="today-pill"><i class="fa-regular fa-calendar"></i> {{currentDate | date:'EEE, dd MMM yyyy'}}</div>
+        <div class="user-chip">
+          <div class="avatar">{{user.name?.charAt(0)}}</div>
+          <div><b>{{user.name}}</b><small>{{isAdmin?'Administrator':(user.designation||'Employee')}}</small></div><span
+            class="role-dot"></span>
+        </div>
+      </div>
+    </header>
+    <div class="content-area">
+      <div class="alert-success" *ngIf="message"><i class="fa-solid fa-circle-check"></i>{{message}}</div>
+      <div class="alert-error" *ngIf="error"><i class="fa-solid fa-circle-exclamation"></i>{{error}}</div>
+      <ng-container *ngIf="page==='dashboard' && !isAdmin">
+        <section class="welcome-banner">
+          <div><span class="eyebrow light">YOUR PERSONAL WORKSPACE</span>
+            <h1>Good {{currentDate.getHours()<12?'morning':currentDate.getHours()<18?'afternoon':'evening'}},
+                {{user.name.split(' ')[0]}} <span>✦</span></h1><p>Here' s your attendance snapshot. Make today
+                count.</p>
+          </div>
+          <div class="banner-date"><i class="fa-regular fa-calendar-check"></i>
+            <div><small>TODAY</small><b>{{currentDate | date:'dd MMMM yyyy'}}</b></div>
+          </div>
+        </section>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa-solid fa-calendar-check"></i></div><small>Present this
+              month</small>
+            <h3>{{attendanceThisMonth}}</h3><span class="stat-note">Recorded attendance days</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon purple"><i class="fa-solid fa-umbrella-beach"></i></div><small>Annual leave
+              remaining</small>
+            <h3>{{balance.annual?.remaining ?? '—'}} <em>days</em></h3><span class="stat-note">Out of
+              {{balance.annual?.entitled ?? 0}} days</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><i class="fa-solid fa-heart-pulse"></i></div><small>Sick leave
+              remaining</small>
+            <h3>{{balance.sick?.remaining ?? '—'}} <em>days</em></h3><span class="stat-note">Out of
+              {{balance.sick?.entitled ?? 0}} days</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><i class="fa-regular fa-hourglass-half"></i></div><small>Pending
+              requests</small>
+            <h3>{{pendingEmployeeLeaves}}</h3><span class="stat-note">Awaiting HR decision</span>
+          </div>
+        </div>
+        <div class="two-col">
+          <section class="panel attendance-panel">
+            <div class="panel-head">
+              <div>
+                <h3>Today's attendance</h3>
+                <p>Check in to start your workday</p>
+              </div>
+              <span class="status-badge"
+                [class.done]="todayAttendance">{{todayAttendance?.checkOut?'Completed':todayAttendance?'Checked in':'Not
+                started'}}</span>
+            </div>
+            <div class="attendance-clock">
+              <div class="clock-ring"><i class="fa-regular fa-clock"></i></div>
+              <div><small>LOCAL TIME</small>
+                <h2>{{currentDate | date:'hh:mm:ss a'}}</h2><span>{{currentDate | date:'EEEE, MMMM d'}}</span>
+              </div>
+            </div>
+            <div class="check-times">
+              <div><small>CHECK IN</small><b>{{todayAttendance?.checkIn?(todayAttendance.checkIn | date:'hh:mm
+                  a'):'--:--'}}</b></div>
+              <div><small>CHECK OUT</small><b>{{todayAttendance?.checkOut?(todayAttendance.checkOut | date:'hh:mm
+                  a'):'--:--'}}</b></div>
+              <div><small>WORKED</small><b>{{todayAttendance?hours(todayAttendance):'0h 0m'}}</b></div>
+            </div><button class="primary-btn w-100" *ngIf="!todayAttendance" (click)="changePage('attendance')">Mark
+              attendance <i class="fa-solid fa-arrow-right"></i></button><button class="primary-btn w-100"
+              *ngIf="todayAttendance && !todayAttendance.checkOut" (click)="changePage('attendance')">Check out <i
+                class="fa-solid fa-arrow-right"></i></button>
+            <div class="completed-note" *ngIf="todayAttendance?.checkOut"><i class="fa-solid fa-circle-check"></i> Your
+              workday is complete. Great job!</div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Leave balance</h3>
+                <p>Your available time off</p>
+              </div><button class="text-btn" (click)="changePage('leaves')">View all <i
+                  class="fa-solid fa-arrow-right"></i></button>
+            </div>
+            <div class="leave-balance"
+              *ngFor="let item of [{key:'annual',label:'Annual leave',icon:'fa-umbrella-beach'},{key:'sick',label:'Sick leave',icon:'fa-heart-pulse'},{key:'casual',label:'Casual leave',icon:'fa-mug-hot'}]">
+              <div class="leave-row"><span class="leave-icon"><i class="fa-solid" [ngClass]="item.icon"></i></span>
+                <div class="leave-name"><b>{{item.label}}</b><small>{{balance[item.key]?.used||0}} used of
+                    {{balance[item.key]?.entitled||0}}</small></div><strong>{{balance[item.key]?.remaining??0}}
+                  <small>left</small></strong>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill"
+                  [style.width.%]="balance[item.key]?.entitled?((balance[item.key].used/balance[item.key].entitled)*100):0">
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <section class="panel mt-4">
+          <div class="panel-head">
+            <div>
+              <h3>Recent attendance</h3>
+              <p>Your latest check-in activity</p>
+            </div><button class="text-btn" (click)="changePage('history')">Full history <i
+                class="fa-solid fa-arrow-right"></i></button>
+          </div>
+          <div class="table-responsive">
+            <table class="table modern-table">
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>CHECK IN</th>
+                  <th>CHECK OUT</th>
+                  <th>WORKED</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of attendance.slice(0,5)">
+                  <td><b>{{row.dateKey}}</b></td>
+                  <td>{{row.checkIn | date:'hh:mm a'}}</td>
+                  <td>{{row.checkOut?(row.checkOut | date:'hh:mm a'):'—'}}</td>
+                  <td>{{hours(row)}}</td>
+                  <td><span class="table-status" [class.late]="row.status==='late'">{{row.status}}</span></td>
+                </tr>
+                <tr *ngIf="!attendance.length">
+                  <td colspan="5" class="empty-state">No attendance records yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
+      <ng-container *ngIf="page==='attendance' && !isAdmin">
+        <div class="page-intro">
+          <div>
+            <h3>Mark your attendance</h3>
+            <p>Take a clear photo and allow location access to record your attendance.</p>
+          </div>
+        </div>
+        <div class="two-col attendance-work">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Attendance verification</h3>
+                <p>Photo and location are required</p>
+              </div>
+              <span class="secure-label"><i class="fa-solid fa-shield-halved"></i> Secure</span>
+            </div>
+            <label class="upload-zone"><input type="file" accept="image/jpeg,image/png,image/webp" capture="user"
+                (change)="onPhoto($event)"><img *ngIf="selectedPreview" [src]="selectedPreview">
+              <div *ngIf="!selectedPreview">
+                <div class="upload-icon"><i class="fa-solid fa-camera"></i></div><b>Take a selfie or upload a
+                  photo</b><small>JPG, PNG or WEBP · Max 5 MB</small><span class="upload-cta">Choose photo</span>
+              </div>
+            </label>
+            <div class="location-box"><span class="location-symbol"><i
+                  class="fa-solid fa-location-crosshairs"></i></span>
+              <div><b>Location verification</b><small *ngIf="latitude===null">Your browser will ask permission when you
+                  mark attendance.</small><small *ngIf="latitude!==null">{{latitude}}, {{longitude}} · Accuracy
+                  {{accuracy|number:'1.0-0'}}m</small></div><span class="location-state"
+                [class.located]="latitude!==null">{{latitude!==null?'Ready':'Required'}}</span>
+            </div>
+            <div class="privacy-note"><i class="fa-solid fa-lock"></i> Your photo and GPS coordinates are collected only
+              when you submit attendance and are visible to authorized HR administrators.</div><button
+              class="primary-btn w-100" [disabled]="busy || !!todayAttendance"
+              (click)="markAttendance('check-in')">{{busy?'Verifying...':'Check in now'}} <i
+                class="fa-solid fa-arrow-right"></i></button><button class="outline-btn w-100 mt-2"
+              [disabled]="busy || !todayAttendance || !!todayAttendance?.checkOut"
+              (click)="markAttendance('check-out')">Check out</button><small class="muted d-block mt-2"
+              *ngIf="todayAttendance">{{todayAttendance.checkOut?'You have completed attendance for today.':'You have
+              checked in. You can check out when your workday ends.'}}</small>
+          </section>
+          <section class="panel">
+            <h3>Attendance guidelines</h3>
+            <div class="guide-item"><span>01</span>
+              <div><b>Use a clear photo</b>
+                <p>Keep your face visible and make sure the image is well-lit.</p>
+              </div>
+            </div>
+            <div class="guide-item"><span>02</span>
+              <div><b>Enable location access</b>
+                <p>Allow your browser to share GPS location while submitting.</p>
+              </div>
+            </div>
+            <div class="guide-item"><span>03</span>
+              <div><b>Check in once a day</b>
+                <p>Mark check-in at the beginning and check-out at the end of your shift.</p>
+              </div>
+            </div>
+            <div class="map-preview"><i class="fa-solid fa-map-location-dot"></i><b>Location is recorded
+                securely</b><small>GPS coordinates are saved with your attendance record.</small></div>
+          </section>
+        </div>
+      </ng-container>
+      <ng-container *ngIf="page==='leaves' && !isAdmin">
+        <div class="page-intro">
+          <div>
+            <h3>My time off</h3>
+            <p>Manage leave requests and keep track of your balance.</p>
+          </div>
+        </div>
+        <div class="stats-grid leave-stats">
+          <div class="stat-card" *ngFor="let key of ['annual','sick','casual']"><small>{{key | titlecase}} leave</small>
+            <h3>{{balance[key]?.remaining??0}} <em>days left</em></h3><span class="stat-note">{{balance[key]?.used||0}}
+              used / {{balance[key]?.entitled||0}} total</span>
+          </div>
+        </div>
+        <div class="two-col">
+          <section class="panel">
+            <h3>Request time off</h3>
+            <p class="muted">Submit your leave request for HR approval.</p>
+            <form (ngSubmit)="submitLeave()"><label>Leave type</label><select class="form-control" name="type"
+                [(ngModel)]="leaveForm.type">
+                <option value="annual">Annual leave</option>
+                <option value="sick">Sick leave</option>
+                <option value="casual">Casual leave</option>
+                <option value="unpaid">Unpaid leave</option>
+              </select>
+              <div class="form-row">
+                <div><label>Start date</label><input class="form-control" type="date" name="start"
+                    [(ngModel)]="leaveForm.startDate" required></div>
+                <div><label>End date</label><input class="form-control" type="date" name="end"
+                    [(ngModel)]="leaveForm.endDate" required></div>
+              </div><label>Reason</label><textarea class="form-control" rows="4" name="reason"
+                [(ngModel)]="leaveForm.reason" placeholder="Tell us briefly why you need time off..."
+                required></textarea><button class="primary-btn mt-3">Submit request <i
+                  class="fa-solid fa-arrow-right"></i></button>
+            </form>
+          </section>
+          <section class="panel">
+            <h3>Leave policy</h3>
+            <div class="policy-row"><i class="fa-solid fa-circle-info"></i>
+              <p>Leave balances are configured by your HR administrator. Approved paid leaves are deducted from the
+                relevant annual allowance.</p>
+            </div>
+            <div class="policy-row"><i class="fa-solid fa-hourglass-half"></i>
+              <p>Requests remain pending until your administrator approves or rejects them.</p>
+            </div>
+            <div class="policy-row"><i class="fa-solid fa-calendar-days"></i>
+              <p>Annual leave entitlement is 24 days per year. Leave is counted in working days only; Saturdays and
+                Sundays are weekly holidays and are not deducted from your balance.</p>
+            </div>
+          </section>
+        </div>
+        <section class="panel mt-4">
+          <div class="panel-head">
+            <h3>Leave history</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="table modern-table">
+              <thead>
+                <tr>
+                  <th>TYPE</th>
+                  <th>DATES</th>
+                  <th>DAYS</th>
+                  <th>REASON</th>
+                  <th>STATUS</th>
+                  <th>HR REMARK</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let l of leaves">
+                  <td>{{l.type|titlecase}}</td>
+                  <td>{{l.startDate|date:'dd MMM'}} – {{l.endDate|date:'dd MMM yyyy'}}</td>
+                  <td>{{l.days}}</td>
+                  <td>{{l.reason}}</td>
+                  <td><span class="table-status" [class.pending]="l.status==='pending'"
+                      [class.rejected]="l.status==='rejected'">{{l.status}}</span></td>
+                  <td>{{l.adminRemark||'—'}}</td>
+                </tr>
+                <tr *ngIf="!leaves.length">
+                  <td colspan="6" class="empty-state">No leave requests submitted yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
+      <ng-container *ngIf="page==='history' && !isAdmin">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Attendance history</h3>
+              <p>Your attendance records</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table modern-table">
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>CHECK IN</th>
+                  <th>CHECK OUT</th>
+                  <th>HOURS</th>
+                  <th>STATUS</th>
+                  <th>LOCATION</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of attendance">
+                  <td>{{row.dateKey}}</td>
+                  <td>{{row.checkIn|date:'hh:mm a'}}</td>
+                  <td>{{row.checkOut?(row.checkOut|date:'hh:mm a'):'—'}}</td>
+                  <td>{{hours(row)}}</td>
+                  <td>{{row.status}}</td>
+                  <td><a *ngIf="row.location" [href]="mapUrl(row.location.latitude,row.location.longitude)"
+                      target="_blank">View map <i class="fa-solid fa-arrow-up-right-from-square"></i></a></td>
+                </tr>
+                <tr *ngIf="!attendance.length">
+                  <td colspan="6" class="empty-state">No records found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
+      <ng-container *ngIf="page==='dashboard' && isAdmin">
+        <section class="welcome-banner admin-banner">
+          <div><span class="eyebrow light">ADMIN CONTROL CENTER</span>
+            <h1>People first. <em>Always.</em></h1>
+            <p>Here's what's happening across your organization today.</p>
+          </div>
+          <div class="banner-date"><i class="fa-solid fa-chart-line"></i>
+            <div><small>LIVE OVERVIEW</small><b>{{currentDate|date:'dd MMM yyyy'}}</b></div>
+          </div>
+        </section>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div><small>Total employees</small>
+            <h3>{{summary.total}}</h3><span class="stat-note">Active team members</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><i class="fa-solid fa-user-check"></i></div><small>Present today</small>
+            <h3>{{summary.present}}</h3><span
+              class="stat-note">{{summary.total?((summary.present/summary.total)*100|number:'1.0-0'):0}}% of
+              employees</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><i class="fa-solid fa-user-clock"></i></div><small>Absent today</small>
+            <h3>{{summary.absent}}</h3><span class="stat-note">Not checked in yet</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon purple"><i class="fa-regular fa-envelope"></i></div><small>Pending leaves</small>
+            <h3>{{pendingLeaves}}</h3><span class="stat-note">Awaiting your review</span>
+          </div>
+        </div>
+        <div class="two-col">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Attendance snapshot</h3>
+                <p>Today's workforce status</p>
+              </div><span class="status-badge done">Live</span>
+            </div>
+            <div class="big-progress">
+              <div class="progress-circle">
+                <strong>{{summary.total?((summary.present/summary.total)*100|number:'1.0-0'):0}}%</strong><small>Present</small>
+              </div>
+              <div class="legend-list">
+                <div><i class="legend-dot green-dot"></i>Present <b>{{summary.present}}</b></div>
+                <div><i class="legend-dot orange-dot"></i>Absent <b>{{summary.absent}}</b></div>
+                <div><i class="legend-dot purple-dot"></i>Late <b>{{summary.late}}</b></div>
+              </div>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Quick actions</h3>
+                <p>Manage your workforce</p>
+              </div>
+            </div>
+            <div class="quick-actions"><button (click)="changePage('employees')"><i
+                  class="fa-solid fa-user-plus"></i><b>Add employee</b><small>Create a new
+                  profile</small></button><button (click)="changePage('admin-attendance')"><i
+                  class="fa-solid fa-calendar-check"></i><b>View attendance</b><small>Monitor
+                  check-ins</small></button><button (click)="changePage('admin-leaves')"><i
+                  class="fa-solid fa-inbox"></i><b>Review leaves</b><small>{{pendingLeaves}} pending
+                  requests</small></button></div>
+          </section>
+        </div>
+        <section class="panel mt-4">
+          <div class="panel-head">
+            <h3>Recent attendance activity</h3><button class="text-btn" (click)="changePage('admin-attendance')">View
+              all <i class="fa-solid fa-arrow-right"></i></button>
+          </div>
+          <div class="table-responsive">
+            <table class="table modern-table">
+              <thead>
+                <tr>
+                  <th>EMPLOYEE</th>
+                  <th>DATE</th>
+                  <th>CHECK IN</th>
+                  <th>CHECK OUT</th>
+                  <th>STATUS</th>
+                  <th>LOCATION</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of adminAttendance.slice(0,5)">
+                  <td><b>{{row.employee?.name}}</b><small class="sub-cell">{{row.employee?.employeeId}}</small></td>
+                  <td>{{row.dateKey}}</td>
+                  <td>{{row.checkIn|date:'hh:mm a'}}</td>
+                  <td>{{row.checkOut?(row.checkOut|date:'hh:mm a'):'—'}}</td>
+                  <td>{{row.status}}</td>
+                  <td><a *ngIf="row.location" [href]="mapUrl(row.location.latitude,row.location.longitude)"
+                      target="_blank">View map</a></td>
+                </tr>
+                <tr *ngIf="!adminAttendance.length">
+                  <td colspan="6" class="empty-state">No attendance activity yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
+      <ng-container *ngIf="page==='employees' && isAdmin">
+        <div class="two-col">
+          <section class="panel">
+            <h3>Add employee</h3>
+            <p class="muted">Create an employee login and configure leave entitlement.</p>
+            <form (ngSubmit)="addEmployee()">
+              <div class="form-row">
+                <div>
+                  <label>Full name</label>
+                  <input class="form-control" name="name" [(ngModel)]="employeeForm.name"required>
+                </div>
+                <div>
+                  <label>Employee ID</label>
+                  <input class="form-control" name="employeeId"[(ngModel)]="employeeForm.employeeId" required>
+                </div>
+              </div>
+              <label>Email</label>
+              <input class="form-control" type="email" name="email"
+                [(ngModel)]="employeeForm.email" required>
+                <label>Temporary password</label><input class="form-control"
+                name="password" [(ngModel)]="employeeForm.password" required>
+              <div class="form-row">
+                <div>
+                  <label>Department</label>
+                  <input class="form-control" name="department"[(ngModel)]="employeeForm.department">
+                </div>
+                <div>
+                  <label>Designation</label>
+                  <input class="form-control" name="designation"[(ngModel)]="employeeForm.designation">
+                </div>
+              </div>
+               <label>Phone</label>
+               <input class="form-control" name="phone" [(ngModel)]="employeeForm.phone">
+              <h4 class="form-subtitle">Annual leave entitlement (days)</h4>
+              <div class="form-row three">
+                <div><label>Annual</label><input class="form-control" type="number" min="0" name="annual"
+                    [(ngModel)]="employeeForm.annual"></div>
+                <div><label>Sick</label><input class="form-control" type="number" min="0" name="sick"
+                    [(ngModel)]="employeeForm.sick"></div>
+                <div><label>Casual</label><input class="form-control" type="number" min="0" name="casual"
+                    [(ngModel)]="employeeForm.casual"></div>
+              </div><button class="primary-btn mt-3">Create employee <i class="fa-solid fa-plus"></i></button>
+            </form>
+          </section>
+          <section class="panel">
+            <h3>Employee directory</h3>
+            <p class="muted">{{employees.length}} employee accounts</p>
+            <div class="employee-list">
+              <div class="employee-item" *ngFor="let e of employees">
+                <div class="avatar">{{e.name?.charAt(0)}}</div>
+                <div class="employee-meta">
+                  <b>{{e.name}}</b>
+                  <small>{{e.employeeId}} · {{e.department||'No department'}}</small>
+                  <small>{{e.email}}</small>
+                </div>
+                <button class="edit-profile-btn" (click)="editEmployee(e)">
+                  <i class="fa-solid fa-pen-to-square"></i>Edit Profile
+                </button>
+                
+                <button (click)="toggleEmployeeStatus(e)" [class]="e.active ? 'deactivate-btn' : 'activate-btn'">
+
+                  <i [class]="e.active
+                    ? 'fa-solid fa-user-slash'
+                    : 'fa-solid fa-user-check'"></i>
+
+                  {{ e.active ? 'Deactivate' : 'Reactivate' }}
+
+                </button>
+              </div>
+              <div class="empty-state" *ngIf="!employees.length">No employees found.</div>
+            </div>
+          </section>
+        </div>
+      </ng-container>
+      <ng-container *ngIf="page==='admin-attendance' && isAdmin">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Attendance records</h3>
+              <p>Employee check-in, check-out and GPS location</p>
+            </div>
+            <div class="attendance-report"><button class="outline-btn"
+                (click)="exportCsv('attendance-report.csv',adminAttendance,['employee.name','employee.employeeId','dateKey','checkIn','checkOut','status','location.latitude','location.longitude'])"><i
+                  class="fa-solid fa-download"></i> Export CSV</button> <span
+                class="status-badge">{{adminAttendance.length}} records</span></div>
+          </div>
+          <div class="table-responsive">
+            <table class="table modern-table">
+              <thead>
+                <tr>
+                  <th>EMPLOYEE</th>
+                  <th>DEPARTMENT</th>
+                  <th>DATE</th>
+                  <th>CHECK IN</th>
+                  <th>CHECK OUT</th>
+                  <th>STATUS</th>
+                  <th>GPS LOCATION</th>
+                  <th>PHOTO FILE</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of adminAttendance">
+                  <td><b>{{row.employee?.name}}</b><small class="sub-cell">{{row.employee?.employeeId}}</small></td>
+                  <td>{{row.employee?.department||'—'}}</td>
+                  <td>{{row.dateKey}}</td>
+                  <td>{{row.checkIn|date:'hh:mm a'}}</td>
+                  <td>{{row.checkOut?(row.checkOut|date:'hh:mm a'):'—'}}</td>
+                  <td>{{row.status}}</td>
+                  <td><a *ngIf="row.location" [href]="mapUrl(row.location.latitude,row.location.longitude)"
+                      target="_blank">Open map <i class="fa-solid fa-arrow-up-right-from-square"></i></a></td>
+                  <td><button class="text-btn" (click)="viewPhoto(row.photo)">View photo <i
+                        class="fa-regular fa-image"></i></button></td>
+                </tr>
+                <tr *ngIf="!adminAttendance.length">
+                  <td colspan="8" class="empty-state">No attendance records found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="privacy-note mt-3"><i class="fa-solid fa-lock"></i> Photos are stored privately on the API server
+            and are not publicly served by this starter build.</div>
+        </section>
+      </ng-container>
+      <ng-container *ngIf="page==='admin-leaves' && isAdmin">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Leave applications</h3>
+              <p>Review employee time-off requests</p>
+            </div>
+            <div class="status-btn">
+              <button class="outline-btn"
+                (click)="exportCsv('leave-report.csv',adminLeaves,['employee.name','employee.employeeId','type','startDate','endDate','days','status','reason'])">
+                <i class="fa-solid fa-download"></i> Export CSV</button>
+              <span class="status-badge pending">{{pendingLeaves}} pending</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table modern-table">
+              <thead>
+                <tr>
+                  <th>EMPLOYEE</th>
+                  <th>LEAVE TYPE</th>
+                  <th>DATES</th>
+                  <th>DAYS</th>
+                  <th>REASON</th>
+                  <th>STATUS</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let l of adminLeaves">
+                  <td><b>{{l.employee?.name}}</b><small class="sub-cell">{{l.employee?.employeeId}}</small></td>
+                  <td>{{l.type|titlecase}}</td>
+                  <td>{{l.startDate|date:'dd MMM'}} – {{l.endDate|date:'dd MMM yyyy'}}</td>
+                  <td>{{l.days}}</td>
+                  <td>{{l.reason}}</td>
+                  <td><span class="table-status" [class.pending]="l.status==='pending'"
+                      [class.rejected]="l.status==='rejected'">{{l.status}}</span><small
+                      class="sub-cell">{{l.adminRemark}}</small></td>
+                  <td>
+                    <div class="action-buttons" *ngIf="l.status==='pending'"><button class="approve-btn"
+                        (click)="reviewLeave(l._id,'approved')"><i class="fa-solid fa-check"></i></button><button
+                        class="reject-btn" (click)="reviewLeave(l._id,'rejected')"><i
+                          class="fa-solid fa-xmark"></i></button></div><span *ngIf="l.status!=='pending'"
+                      class="muted">Reviewed</span>
+                  </td>
+                </tr>
+                <tr *ngIf="!adminLeaves.length">
+                  <td colspan="7" class="empty-state">No leave requests yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
+
+      <!-- EMPLOYEE PROFILE SETTINGS -->
+      <ng-container *ngIf="page==='settings' && !isAdmin">
+
+        <div class="page-intro">
+          <div>
+            <h3>Profile & Settings</h3>
+            <p>Manage your personal information and account security.</p>
+          </div>
+          <span class="status-badge done">
+            <i class="fa-solid fa-shield-halved"></i> Secure Account
+          </span>
+        </div>
+
+        <!-- FIRST LOGIN NOTICE -->
+        <div class="alert-error" *ngIf="user.mustChangePassword">
+          <i class="fa-solid fa-lock"></i>
+          Your password is temporary. Please change it before using your dashboard.
+        </div>
+
+        <div class="two-col">
+
+          <!-- PERSONAL INFORMATION -->
+          <section class="panel">
+
+            <div class="panel-head">
+              <div>
+                <h3><i class="fa-regular fa-user"></i> Personal Information</h3>
+                <p>Update your contact details.</p>
+              </div>
+            </div>
+
+            <div class="profile-summary">
+              <div class="avatar profile-avatar">
+                {{user.name?.charAt(0)}}
+              </div>
+              <div>
+                <h4>{{user.name}}</h4>
+                <small>{{user.designation || 'Employee'}}</small>
+              </div>
+            </div>
+
+            <label>Full Name</label>
+            <input class="form-control" [value]="user.name" disabled>
+
+            <label>Email Address</label>
+            <input class="form-control" [value]="user.email" disabled>
+
+            <label>Employee ID</label>
+            <input class="form-control" [value]="user.employeeId" disabled>
+
+            <label>Department</label>
+            <input class="form-control" [value]="user.department" disabled>
+
+            <label>Phone Number</label>
+            <input class="form-control" name="profilePhone" [(ngModel)]="profileForm.phone"
+              placeholder="Enter phone number">
+
+            <label>Address</label>
+            <textarea class="form-control" name="profileAddress" [(ngModel)]="profileForm.address" rows="3"
+              placeholder="Enter your address">
+      </textarea>
+
+            <button class="primary-btn mt-3" (click)="saveProfile()">
+
+              <i class="fa-solid fa-floppy-disk"></i>
+              Save Profile
+
+            </button>
+
+          </section>
+
+          <!-- CHANGE PASSWORD -->
+          <section class="panel">
+
+            <div class="panel-head">
+              <div>
+                <h3><i class="fa-solid fa-lock"></i> Change Password</h3>
+                <p>Keep your account protected.</p>
+              </div>
+            </div>
+
+            <form (ngSubmit)="changePassword()">
+
+              <label>Current Password</label>
+              <input class="form-control" type="password" name="currentPassword"
+                [(ngModel)]="passwordForm.currentPassword" placeholder="Enter current password" required>
+
+              <label>New Password</label>
+              <input class="form-control" type="password" name="newPassword" [(ngModel)]="passwordForm.newPassword"
+                placeholder="Minimum 8 characters" minlength="8" required>
+
+              <label>Confirm New Password</label>
+              <input class="form-control" type="password" name="confirmPassword"
+                [(ngModel)]="passwordForm.confirmPassword" placeholder="Confirm new password" required>
+
+              <div class="privacy-note">
+                <i class="fa-solid fa-shield-halved"></i>
+                Use a strong password with uppercase, lowercase,
+                numbers and special characters.
+              </div>
+
+              <button class="primary-btn mt-3" type="submit" [disabled]="busy">
+
+                <i class="fa-solid fa-key"></i>
+                {{busy ? 'Updating...' : 'Update Password'}}
+
+              </button>
+
+            </form>
+
+          </section>
+
+        </div>
+
+        <!-- NOTIFICATION SETTINGS -->
+        <section class="panel mt-4">
+
+          <div class="panel-head">
+            <div>
+              <h3><i class="fa-regular fa-bell"></i> Notification Preferences</h3>
+              <p>Choose which notifications you want to receive.</p>
+            </div>
+          </div>
+
+          <div class="notification-setting">
+            <div>
+              <b>Attendance Reminders</b>
+              <small>Receive reminders about daily attendance.</small>
+            </div>
+            <input type="checkbox" name="attendanceReminder" [(ngModel)]="notificationSettings.attendanceReminder">
+          </div>
+
+          <div class="notification-setting">
+            <div>
+              <b>Leave Updates</b>
+              <small>Get notified when leave requests are approved or rejected.</small>
+            </div>
+            <input type="checkbox" name="leaveUpdates" [(ngModel)]="notificationSettings.leaveUpdates">
+          </div>
+
+          <div class="notification-setting">
+            <div>
+              <b>Company Announcements</b>
+              <small>Receive important company announcements.</small>
+            </div>
+            <input type="checkbox" name="announcements" [(ngModel)]="notificationSettings.announcements">
+          </div>
+
+          <button class="primary-btn mt-3" (click)="saveNotifications()">
+
+            <i class="fa-solid fa-floppy-disk"></i>
+            Save Preferences
+
+          </button>
+
+        </section>
+
+      </ng-container>
+
+
+      <!-- EDIT EMPLOYEE PROFILE MODAL -->
+<div class="modal-overlay" *ngIf="showEditEmployeeModal">
+  <div class="modal-card">
+
+    <!-- MODAL HEADER -->
+    <div class="modal-header">
+      <div>
+        <h3>Edit Employee Profile</h3>
+        <p class="muted">
+          Update employee information and leave allowance.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        class="modal-close"
+        (click)="closeEditEmployeeModal()"
+        [disabled]="savingEmployee">
+
+        <i class="fa-solid fa-xmark"></i>
+
+      </button>
+    </div>
+
+    <!-- EDIT EMPLOYEE FORM -->
+    <form (ngSubmit)="saveEmployeeProfile()">
+
+      <!-- NAME AND EMPLOYEE ID -->
+      <div class="form-row">
+
+        <div>
+          <label>Full Name</label>
+
+          <input
+            class="form-control"
+            type="text"
+            name="editName"
+            [(ngModel)]="editEmployeeForm.name"
+            placeholder="Enter full name"
+            required>
+        </div>
+
+        <div>
+          <label>Employee ID</label>
+
+          <input
+            class="form-control"
+            type="text"
+            name="editEmployeeId"
+            [(ngModel)]="editEmployeeForm.employeeId"
+            placeholder="Enter employee ID"
+            required>
+        </div>
+
+      </div>
+
+      <!-- EMAIL -->
+      <label>Email Address</label>
+
+      <input
+        class="form-control"
+        type="email"
+        name="editEmail"
+        [(ngModel)]="editEmployeeForm.email"
+        placeholder="employee@company.com"
+        required>
+
+      <!-- DEPARTMENT AND DESIGNATION -->
+      <div class="form-row">
+
+        <div>
+          <label>Department</label>
+
+          <input
+            class="form-control"
+            type="text"
+            name="editDepartment"
+            [(ngModel)]="editEmployeeForm.department"
+            placeholder="Enter department">
+        </div>
+
+        <div>
+          <label>Designation</label>
+
+          <input
+            class="form-control"
+            type="text"
+            name="editDesignation"
+            [(ngModel)]="editEmployeeForm.designation"
+            placeholder="Enter designation">
+        </div>
+
+      </div>
+
+      <!-- PHONE -->
+      <label>Phone Number</label>
+
+      <input
+        class="form-control"
+        type="text"
+        name="editPhone"
+        [(ngModel)]="editEmployeeForm.phone"
+        placeholder="Enter phone number">
+
+      <!-- JOINING DATE -->
+      <label>Joining Date</label>
+
+      <input
+        class="form-control"
+        type="date"
+        name="editJoiningDate"
+        [(ngModel)]="editEmployeeForm.joiningDate">
+
+      <!-- LEAVE ENTITLEMENT -->
+      <h4 class="form-subtitle">
+        Leave Entitlement (Days)
+      </h4>
+
+      <div class="form-row three">
+
+        <div>
+          <label>Annual Leave</label>
+
+          <input
+            class="form-control"
+            type="number"
+            min="0"
+            name="editAnnual"
+            [(ngModel)]="editEmployeeForm.annual">
+        </div>
+
+        <div>
+          <label>Sick Leave</label>
+
+          <input
+            class="form-control"
+            type="number"
+            min="0"
+            name="editSick"
+            [(ngModel)]="editEmployeeForm.sick">
+        </div>
+
+        <div>
+          <label>Casual Leave</label>
+
+          <input
+            class="form-control"
+            type="number"
+            min="0"
+            name="editCasual"
+            [(ngModel)]="editEmployeeForm.casual">
+        </div>
+
+      </div>
+
+      <!-- MODAL ACTIONS -->
+      <div class="modal-actions">
+
+        <button
+          type="button"
+          class="outline-btn"
+          (click)="closeEditEmployeeModal()"
+          [disabled]="savingEmployee">
+
+          Cancel
+
+        </button>
+
+        <button
+          type="submit"
+          class="primary-btn"
+          [disabled]="savingEmployee">
+
+          <i
+            class="fa-solid"
+            [ngClass]="savingEmployee
+              ? 'fa-spinner fa-spin'
+              : 'fa-floppy-disk'">
+          </i>
+
+          {{ savingEmployee ? 'Saving...' : 'Save Changes' }}
+
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+</div>
+
+      <footer class="footer-note">© {{currentDate|date:'yyyy'}} Attendify HR <span>Built for better workdays.</span>
+      </footer>
+    </div>
+  </main>
+</div>
