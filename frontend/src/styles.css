@@ -2037,4 +2037,408 @@ button {
       width: 100%;
     }
   }
+
+/* Responsive layout refinements */
+html,
+body {
+    min-width: 320px;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+img,
+svg {
+    max-width: 100%;
+}
+
+.main-area,
+.content-area,
+.panel,
+.stat-card {
+    min-width: 0;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.menu-toggle {
+    display: none;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--navy);
+    font-size: 16px;
+}
+
+.sidebar-overlay {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .sidebar {
+        width: min(290px, 84vw);
+        padding: 24px 17px;
+        overflow-y: auto;
+        transform: translateX(-105%);
+        transition: transform .25s ease;
+        box-shadow: 16px 0 40px #101a3630;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .sidebar .brand {
+        padding: 0 10px 32px;
+        font-size: 20px;
+    }
+
+    .sidebar .brand>span:last-child {
+        font-size: 20px;
+    }
+
+    .sidebar .workspace-label {
+        font-size: 9px;
+    }
+
+    .sidebar .nav-link,
+    .sidebar .nav-link:not(.logout),
+    .sidebar .logout {
+        justify-content: flex-start;
+        padding: 12px 13px;
+        font-size: 12px;
+    }
+
+    .sidebar .nav-link i,
+    .sidebar .logout i {
+        font-size: 14px;
+    }
+
+    .sidebar .nav-count {
+        display: inline-block;
+    }
+
+    .sidebar .help-card {
+        display: grid;
+    }
+
+    .sidebar-bottom {
+        margin-top: auto;
+    }
+
+    .main-area {
+        margin-left: 0;
+    }
+
+    .menu-toggle {
+        display: inline-grid;
+        place-items: center;
+    }
+
+    .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .sidebar-overlay.show {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 4;
+        background: rgb(12 20 40 / 48%);
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .two-col,
+    .attendance-work {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .quick-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .quick-actions button {
+        min-width: 0;
+    }
+
+    .employee-item {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 680px) {
+    .login-panel {
+        min-height: 100vh;
+        padding: 24px 20px;
+    }
+
+    .mobile-brand {
+        margin-bottom: 36px;
+    }
+
+    .login-card h2 {
+        font-size: clamp(22px, 6vw, 27px);
+        line-height: 1.2;
+    }
+
+    .topbar {
+        min-height: 70px;
+        gap: 10px;
+        padding: 12px 14px;
+    }
+
+    .topbar-left {
+        gap: 9px;
+    }
+
+    .topbar h2 {
+        font-size: 16px;
+    }
+
+    .breadcrumb {
+        font-size: 9px;
+    }
+
+    .breadcrumb i {
+        margin: 0 4px;
+    }
+
+    .top-actions {
+        gap: 0;
+        min-width: 0;
+    }
+
+    .today-pill,
+    .role-dot {
+        display: none;
+    }
+
+    .user-chip {
+        gap: 7px;
+    }
+
+    .user-chip b {
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 10px;
+    }
+
+    .user-chip small {
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 9px;
+    }
+
+    .content-area {
+        padding: 16px 12px 24px;
+    }
+
+    .welcome-banner {
+        padding: 21px 17px;
+    }
+
+    .welcome-banner h1 {
+        font-size: clamp(20px, 5.5vw, 25px);
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .stats-grid,
+    .two-col,
+    .attendance-work,
+    .leave-stats {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .stat-card {
+        min-height: 0;
+    }
+
+    .panel {
+        padding: 17px 14px;
+    }
+
+    .panel-head {
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .panel-head > :first-child {
+        min-width: 0;
+    }
+
+    .quick-actions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .form-row,
+    .form-row.three {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .page-intro {
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .attendance-report,
+    .status-btn {
+        flex-wrap: wrap;
+    }
+
+    .upload-zone {
+        height: clamp(210px, 58vw, 290px);
+    }
+
+    .location-box {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .location-box > div {
+        min-width: 0;
+        flex: 1 1 150px;
+        overflow-wrap: anywhere;
+    }
+
+    .location-state {
+        margin-left: 45px;
+    }
+
+    .check-times > div + div {
+        padding-left: 9px;
+    }
+
+    .check-times b {
+        font-size: 11px;
+    }
+
+    .employee-item {
+        align-items: flex-start;
+    }
+
+    .employee-meta {
+        min-width: calc(100% - 60px);
+        overflow-wrap: anywhere;
+    }
+
+    .employee-item .edit-profile-btn,
+    .employee-item .activate-btn,
+    .employee-item .deactivate-btn {
+        flex: 1 1 auto;
+    }
+
+    .big-progress {
+        gap: 18px;
+    }
+
+    .progress-circle {
+        width: 100px;
+        height: 100px;
+        flex: 0 0 auto;
+    }
+
+    .legend-list {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .modern-table {
+        min-width: 600px;
+    }
+
+    .table-responsive {
+        margin-inline: -2px;
+    }
+
+    .notification-setting {
+        align-items: flex-start;
+    }
+
+    .notification-setting > div {
+        min-width: 0;
+    }
+
+    .footer-note span {
+        display: none;
+    }
+}
+
+@media (max-width: 380px) {
+    .login-panel {
+        padding: 20px 16px;
+    }
+
+    .topbar {
+        padding-inline: 10px;
+    }
+
+    .topbar-left {
+        gap: 7px;
+    }
+
+    .menu-toggle {
+        width: 36px;
+        height: 36px;
+    }
+
+    .user-chip > div:not(.avatar) {
+        display: none;
+    }
+
+    .content-area {
+        padding-inline: 10px;
+    }
+
+    .panel {
+        padding-inline: 12px;
+    }
+
+    .check-times {
+        gap: 4px;
+    }
+
+    .check-times > div + div {
+        padding-left: 6px;
+    }
+
+    .check-times small {
+        font-size: 7px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}
   

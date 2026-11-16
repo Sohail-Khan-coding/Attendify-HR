@@ -6,12 +6,6 @@
     <div class="login-copy"><span class="eyebrow">SMART PEOPLE. SMARTER WORK.</span>
       <h1>Every moment<br><em>counts.</em></h1>
       <p>A simpler way to manage attendance, people and time off — all in one beautiful workspace.</p>
-      <button class="nav-link" [class.active]="page==='settings'" (click)="changePage('settings')">
-
-        <i class="fa-solid fa-gear"></i>
-        Profile & Settings
-
-      </button>
       <div class="login-points">
         <span><i class="fa-solid fa-location-dot"></i> Location verified</span>
         <span><i class="fa-solid fa-shield-halved"></i> Secure records</span>
@@ -46,7 +40,8 @@
   </div>
 </div>
 <div *ngIf="user" class="app-shell">
-  <aside class="sidebar" [class.sidebar-admin]="isAdmin">
+  <div class="sidebar-overlay" [class.show]="menuOpen" (click)="menuOpen = false"></div>
+  <aside class="sidebar" [class.open]="menuOpen" [class.sidebar-admin]="isAdmin">
     <div class="brand"><span class="brand-icon"><i class="fa-solid fa-fingerprint"></i></span> Attendify<span>HR</span>
     </div>
     <div class="workspace-label">WORKSPACE</div>
@@ -77,10 +72,16 @@
   </aside>
   <main class="main-area">
     <header class="topbar">
-      <div>
-        <div class="breadcrumb">Workspace <i class="fa-solid fa-chevron-right"></i> <b>{{page.replace('-',' ') |
-            titlecase}}</b></div>
-        <h2>{{page==='dashboard'?'Overview':page.replace('-',' ') | titlecase}}</h2>
+      <div class="topbar-left">
+        <button type="button" class="menu-toggle" (click)="menuOpen = !menuOpen"
+          [attr.aria-expanded]="menuOpen" aria-label="Toggle navigation">
+          <i class="fa-solid" [ngClass]="menuOpen ? 'fa-xmark' : 'fa-bars'"></i>
+        </button>
+        <div>
+          <div class="breadcrumb">Workspace <i class="fa-solid fa-chevron-right"></i> <b>{{page.replace('-',' ') |
+              titlecase}}</b></div>
+          <h2>{{page==='dashboard'?'Overview':page.replace('-',' ') | titlecase}}</h2>
+        </div>
       </div>
       <div class="top-actions">
         <div class="today-pill"><i class="fa-regular fa-calendar"></i> {{currentDate | date:'EEE, dd MMM yyyy'}}</div>

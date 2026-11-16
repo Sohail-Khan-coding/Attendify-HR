@@ -7,12 +7,15 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
   templateUrl: './app.component.html'
 })
 export class AppComponent {
-  api = 'http://localhost:5000/api';
+  api = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
+    : 'https://attendify-hr.vercel.app/api';
 
   token = localStorage.getItem('attendify_token') || '';
   user: any = JSON.parse(localStorage.getItem('attendify_user') || 'null');
 
   page = 'dashboard';
+  menuOpen = false;
   busy = false;
 
   message = '';
@@ -307,6 +310,8 @@ export class AppComponent {
 
   // PAGE NAVIGATION
   changePage(page: string) {
+    this.menuOpen = false;
+
     if (
       !this.isAdmin &&
       this.user?.mustChangePassword &&
