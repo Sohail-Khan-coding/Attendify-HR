@@ -2606,4 +2606,51 @@ svg {
         transition-duration: .01ms !important;
     }
 }
+
+@media (max-width: 680px), (pointer: coarse) and (hover: none) {
+    .app-shell {
+        width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow-x: clip;
+    }
+
+    .main-area,
+    .topbar,
+    .content-area {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .topbar {
+        justify-content: space-between;
+    }
+
+    .content-area {
+        padding-inline: clamp(14px, 4vw, 20px);
+    }
+
+    .welcome-banner,
+    .stat-card,
+    .panel {
+        width: 100%;
+        border-radius: 15px;
+    }
+
+    .stats-grid,
+    .two-col,
+    .attendance-work,
+    .leave-stats {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    .login-card {
+        width: min(100%, 520px);
+    }
+
+    .login-panel {
+        padding-inline: clamp(18px, 6vw, 32px);
+    }
+}
   
