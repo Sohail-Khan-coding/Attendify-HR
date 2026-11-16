@@ -840,6 +840,17 @@
 
 
       <!-- EDIT EMPLOYEE PROFILE MODAL -->
+<div class="photo-preview-overlay" *ngIf="attendancePhotoUrl" (click)="closeAttendancePhoto()">
+  <div class="photo-preview-card" role="dialog" aria-modal="true" aria-label="Attendance photo"
+    (click)="$event.stopPropagation()">
+    <button type="button" class="photo-preview-close" (click)="closeAttendancePhoto()" aria-label="Close photo">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <img [src]="attendancePhotoUrl" alt="Employee attendance verification photo">
+  </div>
+</div>
+
+      <!-- EDIT EMPLOYEE PROFILE MODAL -->
 <div class="modal-overlay" *ngIf="showEditEmployeeModal">
   <div class="modal-card">
 

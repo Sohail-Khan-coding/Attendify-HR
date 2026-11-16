@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const multer = require('multer');
+const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const Attendance = require('../models/Attendance');
@@ -7,25 +8,31 @@ const User = require('../models/User');
 const Leave = require('../models/Leave');
 const { protect, adminOnly } = require('../middleware/auth');
 const { localDateKey, isWorkingDay } = require('../utils/dates');
-const uploadRoot = path.resolve(process.env.UPLOAD_DIR || 'uploads'); fs.mkdirSync(uploadRoot, { recursive: true });
-const storage = multer.diskStorage({ destination: (req, file, cb) => cb(null, uploadRoot), filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${path.extname(file.originalname).toLowerCase()}`) });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => cb(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) });
+const { getPhotoBucket, storeAttendancePhoto, deleteAttendancePhoto } = require('../utils/attendancePhotos');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => cb(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) });
 router.use(protect);
 router.post('/check-in', upload.single('photo'), async (req, res) => {
+  let photoId;
   try {
     if (!req.file) return res.status(400).json({ message: 'Attendance photo is required (JPG, PNG or WEBP).' });
     const latitude = Number(req.body.latitude), longitude = Number(req.body.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) { fs.unlinkSync(req.file.path); return res.status(400).json({ message: 'Location permission is required to mark attendance.' }); }
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return res.status(400).json({ message: 'Location permission is required to mark attendance.' });
     const dateKey = localDateKey();
     const exists = await Attendance.findOne({ employee: req.user._id, dateKey });
-    if (exists) { fs.unlinkSync(req.file.path); return res.status(409).json({ message: 'Attendance already marked today.' }); }
+    if (exists) return res.status(409).json({ message: 'Attendance already marked today.' });
     const now = new Date(); const [officeHour, officeMinute] = (process.env.OFFICE_START_TIME || '09:30').split(':').map(Number); const grace = Number(process.env.LATE_GRACE_MINUTES || 30); const deadline = new Date(now); deadline.setHours(officeHour, officeMinute + grace, 0, 0); const late = now > deadline;
-    const row = await Attendance.create({ employee: req.user._id, dateKey, checkIn: now, photo: req.file.filename, location: { latitude, longitude, accuracy: Number(req.body.accuracy) || null }, status: late ? 'late' : 'present' });
+    photoId = await storeAttendancePhoto(req.file);
+    const row = await Attendance.create({ employee: req.user._id, dateKey, checkIn: now, photo: photoId, location: { latitude, longitude, accuracy: Number(req.body.accuracy) || null }, status: late ? 'late' : 'present' });
     res.status(201).json(row);
-  } catch (e) { if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); res.status(400).json({ message: e.code === 11000 ? 'Attendance already marked today.' : e.message }); }
+  } catch (e) {
+    if (photoId) await deleteAttendancePhoto(photoId).catch(() => {});
+    console.error('Check-in error:', e);
+    res.status(400).json({ message: e.code === 11000 ? 'Attendance already marked today.' : e.message });
+  }
 });
 
 router.post('/check-out', upload.single('photo'), async (req, res) => {
+  let photoId;
   try {
     const row = await Attendance.findOne({
       employee: req.user._id,
@@ -33,16 +40,12 @@ router.post('/check-out', upload.single('photo'), async (req, res) => {
     });
 
     if (!row) {
-      if (req.file) fs.unlinkSync(req.file.path);
-
       return res.status(404).json({
         message: 'Please check in first.'
       });
     }
 
     if (row.checkOut) {
-      if (req.file) fs.unlinkSync(req.file.path);
-
       return res.status(409).json({
         message: 'You have already checked out.'
       });
@@ -81,9 +84,7 @@ router.post('/check-out', upload.single('photo'), async (req, res) => {
     row.checkOut = now;
     row.checkOutStatus = checkOutStatus;
 
-    if (req.file) {
-      row.checkOutPhoto = req.file.filename;
-    }
+    if (req.file) row.checkOutPhoto = photoId = await storeAttendancePhoto(req.file);
 
     if (req.body.latitude && req.body.longitude) {
       row.checkOutLocation = {
@@ -102,9 +103,7 @@ router.post('/check-out', upload.single('photo'), async (req, res) => {
     });
 
   } catch (e) {
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    if (photoId) await deleteAttendancePhoto(photoId).catch(() => {});
 
     console.error('Check-out error:', e);
 
@@ -114,16 +113,41 @@ router.post('/check-out', upload.single('photo'), async (req, res) => {
   }
 });
 
-router.get('/photo/:filename', async (req, res) => {
-  const filename = path.basename(req.params.filename);
-  const record = await Attendance.findOne({ $or: [{ photo: filename }, { checkOutPhoto: filename }] });
-  if (!record) return res.status(404).json({ message: 'Photo not found.' });
-  if (req.user.role !== 'admin' && String(record.employee) !== String(req.user._id)) 
-    return res.status(403).json({ message: 'Not allowed to view this photo.' });
-  const filePath = path.join(uploadRoot, filename); 
-  if (!fs.existsSync(filePath)) 
-    return res.status(404).json({ message: 'Photo file is unavailable.' });
-  res.sendFile(filePath);
+router.get('/photo/:filename', async (req, res, next) => {
+  try {
+    const photoId = req.params.filename;
+    const record = await Attendance.findOne({
+      $or: [{ photo: photoId }, { checkOutPhoto: photoId }]
+    });
+    if (!record) return res.status(404).json({ message: 'Photo not found.' });
+    if (req.user.role !== 'admin' && String(record.employee) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'Not allowed to view this photo.' });
+    }
+
+    // Continue serving legacy local uploads when they still exist on disk.
+    if (!mongoose.Types.ObjectId.isValid(photoId)) {
+      const uploadRoot = path.resolve(process.env.UPLOAD_DIR || 'uploads');
+      const filePath = path.join(uploadRoot, path.basename(photoId));
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: 'Photo file is unavailable.' });
+      }
+
+      res.set('Cache-Control', 'private, no-store');
+      return res.sendFile(filePath);
+    }
+
+    const bucket = getPhotoBucket();
+    const file = await bucket.find({ _id: new mongoose.Types.ObjectId(photoId) }).next();
+    if (!file) return res.status(404).json({ message: 'Photo file is unavailable.' });
+
+    res.set('Content-Type', file.contentType || file.metadata?.contentType || 'application/octet-stream');
+    res.set('Cache-Control', 'private, no-store');
+    const downloadStream = bucket.openDownloadStream(file._id);
+    downloadStream.on('error', next);
+    downloadStream.pipe(res);
+  } catch (error) {
+    next(error);
+  }
 });
 router.get('/mine', async (req, res) => { const rows = await Attendance.find({ employee: req.user._id }).sort({ dateKey: -1 }).limit(100); res.json(rows); });
 router.get('/today', async (req, res) => { const row = await Attendance.findOne({ employee: req.user._id, dateKey: localDateKey() }); res.json(row); });

@@ -101,6 +101,7 @@ export class AppComponent {
 
   selectedPhoto: File | null = null;
   selectedPreview = '';
+  attendancePhotoUrl = '';
 
   latitude: number | null = null;
   longitude: number | null = null;
@@ -815,6 +816,11 @@ export class AppComponent {
 
   // VIEW ATTENDANCE PHOTO
   viewPhoto(filename: string) {
+    if (this.attendancePhotoUrl) {
+      URL.revokeObjectURL(this.attendancePhotoUrl);
+      this.attendancePhotoUrl = '';
+    }
+
     this.http.get(
       `${this.api}/attendance/photo/${encodeURIComponent(filename)}`,
       {
@@ -825,13 +831,7 @@ export class AppComponent {
       }
     ).subscribe({
       next: blob => {
-        const url = URL.createObjectURL(blob);
-
-        window.open(url, '_blank');
-
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-        }, 60000);
+        this.attendancePhotoUrl = URL.createObjectURL(blob);
       },
       error: () => {
         this.notify(
@@ -840,6 +840,13 @@ export class AppComponent {
         );
       }
     });
+  }
+
+  closeAttendancePhoto() {
+    if (this.attendancePhotoUrl) {
+      URL.revokeObjectURL(this.attendancePhotoUrl);
+      this.attendancePhotoUrl = '';
+    }
   }
 
   // EXPORT CSV
