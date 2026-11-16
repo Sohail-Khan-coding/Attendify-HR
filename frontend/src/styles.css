@@ -2233,6 +2233,11 @@ svg {
 }
 
 @media (max-width: 680px), (pointer: coarse) and (hover: none) {
+    body {
+        font-size: 16px;
+        line-height: 1.5;
+    }
+
     .login-panel {
         min-height: 100vh;
         padding: 24px 20px;
@@ -2258,11 +2263,11 @@ svg {
     }
 
     .topbar h2 {
-        font-size: 16px;
+        font-size: 18px;
     }
 
     .breadcrumb {
-        font-size: 9px;
+        font-size: 11px;
     }
 
     .breadcrumb i {
@@ -2284,23 +2289,23 @@ svg {
     }
 
     .user-chip b {
-        max-width: 100px;
+        max-width: 130px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 10px;
+        font-size: 12px;
     }
 
     .user-chip small {
-        max-width: 100px;
+        max-width: 130px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 9px;
+        font-size: 11px;
     }
 
     .content-area {
-        padding: 16px 12px 24px;
+        padding: 20px 14px 28px;
     }
 
     .welcome-banner {
@@ -2308,9 +2313,19 @@ svg {
     }
 
     .welcome-banner h1 {
-        font-size: clamp(20px, 5.5vw, 25px);
+        font-size: clamp(23px, 6vw, 29px);
         line-height: 1.25;
         overflow-wrap: anywhere;
+    }
+
+    .welcome-banner p,
+    .login-card > p {
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .eyebrow {
+        font-size: 11px;
     }
 
     .stats-grid,
@@ -2321,11 +2336,38 @@ svg {
     }
 
     .stat-card {
-        min-height: 0;
+        min-height: 120px;
+        padding: 19px;
+    }
+
+    .stat-card > small {
+        font-size: 13px;
+    }
+
+    .stat-card h3 {
+        font-size: 28px;
+    }
+
+    .stat-note {
+        font-size: 11px;
     }
 
     .panel {
-        padding: 17px 14px;
+        padding: 20px 16px;
+    }
+
+    .panel h3 {
+        font-size: 18px;
+    }
+
+    .panel-head p,
+    .page-intro p {
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .page-intro h3 {
+        font-size: 21px;
     }
 
     .panel-head {
@@ -2344,6 +2386,46 @@ svg {
     .form-row,
     .form-row.three {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .panel label,
+    .login-card label {
+        font-size: 13px;
+    }
+
+    .panel .form-control {
+        min-height: 48px;
+        font-size: 16px;
+    }
+
+    .panel textarea.form-control {
+        min-height: 110px;
+    }
+
+    .primary-btn,
+    .outline-btn,
+    .text-btn,
+    .edit-profile-btn,
+    .activate-btn,
+    .deactivate-btn {
+        min-height: 44px;
+        font-size: 14px;
+    }
+
+    .text-btn {
+        padding: 9px 4px;
+    }
+
+    .input-wrap {
+        min-height: 52px;
+    }
+
+    .input-wrap input {
+        font-size: 16px;
+    }
+
+    .login-card > small {
+        font-size: 12px;
     }
 
     .page-intro {
@@ -2381,7 +2463,13 @@ svg {
     }
 
     .check-times b {
-        font-size: 11px;
+        font-size: 13px;
+    }
+
+    .check-times small,
+    .attendance-clock small,
+    .attendance-clock span {
+        font-size: 10px;
     }
 
     .employee-item {
@@ -2415,7 +2503,33 @@ svg {
     }
 
     .modern-table {
-        min-width: 600px;
+        min-width: 680px;
+    }
+
+    .modern-table thead th {
+        font-size: 10px;
+    }
+
+    .modern-table tbody td {
+        font-size: 12px;
+        padding: 13px 11px;
+    }
+
+    .privacy-note,
+    .location-box small,
+    .guide-item p,
+    .policy-row p {
+        font-size: 12px;
+        line-height: 1.55;
+    }
+
+    .employee-meta b {
+        font-size: 13px;
+    }
+
+    .employee-meta small,
+    .notification-setting small {
+        font-size: 11px;
     }
 
     .table-responsive {
@@ -2474,7 +2588,11 @@ svg {
     }
 
     .check-times small {
-        font-size: 7px;
+        font-size: 9px;
+    }
+
+    .check-times b {
+        font-size: 12px;
     }
 }
 
@@ -2489,8 +2607,3 @@ svg {
     }
 }
   
-@media (max-width: 680px) {
-    body {
-        outline: 5px solid red !important;
-    }
-}
