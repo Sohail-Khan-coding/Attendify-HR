@@ -29,29 +29,3 @@ module.exports = async (req, res) => {
 		return res.status(500).json({ message: 'Database connection failed.' });
 	}
 };
-
-
-const allowedOrigins = [
-    'http://localhost:4200',
-    'https://attendify-hr-by-sohail-khan.vercel.app',
-    'https://attendify-hr-by-sohail-khan-ez9tk4hcx-sk-bd8f.vercel.app'
-];
-
-const corsOptions = {
-    origin: function (origin, callback) {
-        // Allow requests without an Origin header (e.g. server-to-server)
-        if (!origin || allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
-
-        console.log('CORS blocked origin:', origin);
-        return callback(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 204
-};
-
-// CORS must be registered before routes and other middleware.
-app.use(cors(corsOptions));

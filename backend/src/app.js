@@ -3,8 +3,11 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 const app = express();
-const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:4200')
-  .split(',')
+const allowedOrigins = [
+  ...(process.env.CLIENT_URL || 'http://localhost:4200').split(','),
+  'https://attendify-hr-by-sohail-khan.vercel.app',
+  'https://attendify-hr-by-sohail-khan-ez9tk4hcx-sk-bd8f.vercel.app'
+]
   .map(origin => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
