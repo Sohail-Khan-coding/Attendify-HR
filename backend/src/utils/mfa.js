@@ -1,10 +1,5 @@
 const crypto = require('node:crypto');
-const { generate, generateSecret, generateURI, verify } = require('otplib');
-
-const authenticator = {
-  generateSecret,
-  keyuri: (email, issuer, secret) => generateURI({ label: email, issuer, secret })
-};
+const { authenticator } = require('otplib');
 
 function encryptionKey() {
   const value = process.env.MFA_ENCRYPTION_KEY || '';
@@ -28,15 +23,11 @@ function decryptSecret(value) {
   return Buffer.concat([decipher.update(Buffer.from(contentHex, 'hex')), decipher.final()]).toString('utf8');
 }
 
-async function verifyCode(secret, token) {
-  const result = await verify({ secret, token: String(token || '').replace(/\s/g, '') });
-  return result.valid;
+function verifyCode(secret, token) {
+  return authenticator.verify({
+    secret,
+    token: String(token || '').replace(/\s/g, '')
+  });
 }
 
-module.exports = {
-  authenticator,
-  generateCode: secret => generate({ secret }),
-  encryptSecret,
-  decryptSecret,
-  verifyCode
-};
+module.exports = { authenticator, encryptSecret, decryptSecret, verifyCode };
