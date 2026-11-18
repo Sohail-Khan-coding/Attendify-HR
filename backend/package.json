@@ -2,6 +2,9 @@
   "name": "attendify-hr-api",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
