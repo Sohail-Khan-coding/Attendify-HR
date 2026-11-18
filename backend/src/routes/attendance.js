@@ -9,6 +9,8 @@ const Leave = require('../models/Leave');
 const { protect, adminOnly } = require('../middleware/auth');
 const { localDateKey, isWorkingDay } = require('../utils/dates');
 const { getPhotoBucket, storeAttendancePhoto, deleteAttendancePhoto } = require('../utils/attendancePhotos');
+const { writeAudit } = require('../utils/audit');
+const { notifyRoles } = require('../utils/notifications');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => cb(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) });
 router.use(protect);
 router.post('/check-in', upload.single('photo'), async (req, res) => {
@@ -23,6 +25,8 @@ router.post('/check-in', upload.single('photo'), async (req, res) => {
     const now = new Date(); const [officeHour, officeMinute] = (process.env.OFFICE_START_TIME || '09:30').split(':').map(Number); const grace = Number(process.env.LATE_GRACE_MINUTES || 30); const deadline = new Date(now); deadline.setHours(officeHour, officeMinute + grace, 0, 0); const late = now > deadline;
     photoId = await storeAttendancePhoto(req.file);
     const row = await Attendance.create({ employee: req.user._id, dateKey, checkIn: now, photo: photoId, location: { latitude, longitude, accuracy: Number(req.body.accuracy) || null }, status: late ? 'late' : 'present' });
+    await writeAudit({ req, action: 'attendance.checked_in', entityType: 'attendance', entityId: row._id, summary: `Employee checked in for ${dateKey}.` }).catch(error => console.error('Audit write failed:', error.message));
+    await notifyRoles(['admin'], { title: 'Employee checked in', message: `${req.user.name} checked in at ${now.toLocaleTimeString()}.`, category: 'attendance', link: '/admin-attendance' }).catch(error => console.error('Notification delivery failed:', error.message));
     res.status(201).json(row);
   } catch (e) {
     if (photoId) await deleteAttendancePhoto(photoId).catch(() => {});
@@ -95,6 +99,8 @@ router.post('/check-out', upload.single('photo'), async (req, res) => {
     }
 
     await row.save();
+    await writeAudit({ req, action: 'attendance.checked_out', entityType: 'attendance', entityId: row._id, summary: `Employee checked out for ${row.dateKey}.` }).catch(error => console.error('Audit write failed:', error.message));
+    await notifyRoles(['admin'], { title: 'Employee checked out', message: `${req.user.name} checked out at ${now.toLocaleTimeString()}.`, category: 'attendance', link: '/admin-attendance' }).catch(error => console.error('Notification delivery failed:', error.message));
 
     res.json({
       message: 'Check-out successful.',

@@ -3,6 +3,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 const app = express();
+app.set('trust proxy', 1);
 const allowedOrigins = [
   ...(process.env.CLIENT_URL || 'http://localhost:4200').split(','),
   'https://attendify-hr-by-sohail-khan.vercel.app',
@@ -35,9 +36,13 @@ app.use(morgan('dev'));
 // Uploaded files are deliberately not exposed as a public static directory.
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'Attendify HR API' }));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/leaves', require('./routes/leaves'));
+app.use('/api/attendance-corrections', require('./routes/attendanceCorrections'));
+app.use('/api/audit', require('./routes/audit'));
+app.use('/api/reports', require('./routes/reports'));
 
 app.use((err, req, res, next) => {
   console.error(err);

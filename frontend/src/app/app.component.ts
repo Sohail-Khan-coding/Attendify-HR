@@ -1,12 +1,15 @@
 
-import { Component } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Component, HostListener, OnDestroy } from '@angular/core';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import * as QRCode from 'qrcode';
+import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html'
 })
-export class AppComponent {
+export class AppComponent implements OnDestroy {
   api = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:5000/api'
     : 'https://attendify-hr.vercel.app/api';
@@ -17,6 +20,16 @@ export class AppComponent {
   page = 'dashboard';
   menuOpen = false;
   busy = false;
+  mfaRequired = false;
+  mfaChallengeToken = '';
+  mfaCode = '';
+  mfaSetupPassword = '';
+  mfaCurrentCode = '';
+  mfaSetupCode = '';
+  mfaSetupSecret = '';
+  mfaQrCode = '';
+  mfaRecoveryCodes: string[] = [];
+  replacingAdminMfa = false;
 
   message = '';
   error = '';
@@ -29,6 +42,29 @@ export class AppComponent {
   employees: any[] = [];
   adminAttendance: any[] = [];
   adminLeaves: any[] = [];
+  attendanceCorrections: any[] = [];
+  adminCorrections: any[] = [];
+  auditEvents: any[] = [];
+  auditTotal = 0;
+  notifications: any[] = [];
+  unreadNotifications = 0;
+  notificationBubble: any = null;
+  notificationBubbleTimer: ReturnType<typeof setTimeout> | null = null;
+  notificationPolling: ReturnType<typeof setInterval> | null = null;
+  notificationIds = new Set<string>();
+  notificationFeedInitialized = false;
+  notificationAudio: AudioContext | null = null;
+  notificationSoundUnlocked = false;
+  notificationPushConfigured = false;
+  notificationSettingsOpen = false;
+
+  correctionForm: any = { dateKey: '', requestedCheckIn: '', requestedCheckOut: '', reason: '' };
+  reportStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA');
+  reportEnd = new Date().toLocaleDateString('en-CA');
+  reportAttendance: any[] = [];
+  reportLeaves: any[] = [];
+  reportSummary: any = { attendance: {}, leaves: {} };
+  announcementForm: any = { title: '', message: '' };
 
   summary: any = {
     total: 0,
@@ -39,8 +75,8 @@ export class AppComponent {
   };
 
   loginForm: any = {
-    email: 'employee@attendify.local',
-    password: 'Employee@12345'
+    email: '',
+    password: ''
   };
 
   profileForm: any = {
@@ -57,7 +93,9 @@ export class AppComponent {
   notificationSettings: any = {
     attendanceReminder: true,
     leaveUpdates: true,
-    announcements: true
+    announcements: true,
+    push: true,
+    sound: true
   };
 
   leaveForm: any = {
@@ -70,7 +108,7 @@ export class AppComponent {
   employeeForm: any = {
     name: '',
     email: '',
-    password: 'Welcome@123',
+    password: '',
     employeeId: '',
     department: '',
     designation: '',
@@ -110,9 +148,45 @@ export class AppComponent {
   currentDate = new Date();
 
   constructor(private http: HttpClient) {
-    if (this.token && this.user) {
-      this.loadData();
+    const requestedPage = new URLSearchParams(window.location.search).get('page') || '';
+    const allowedPages = ['dashboard', 'attendance', 'leaves', 'history', 'employees', 'admin-attendance', 'admin-leaves', 'corrections', 'reports', 'audit', 'settings', 'notifications'];
+    const adminOnlyPages = ['employees', 'admin-attendance', 'admin-leaves', 'reports', 'audit'];
+    if (this.user && allowedPages.includes(requestedPage)
+      && (this.user.role === 'admin' || !adminOnlyPages.includes(requestedPage))) {
+      this.page = requestedPage;
     }
+
+    if (this.token && this.user) {
+      this.loadNotificationPreferences();
+      this.loadData();
+      this.startNotificationPolling();
+    }
+  }
+
+  ngOnDestroy() {
+    if (this.notificationPolling) clearInterval(this.notificationPolling);
+    if (this.notificationBubbleTimer) clearTimeout(this.notificationBubbleTimer);
+    this.closeAttendancePhoto();
+    this.notificationAudio?.close();
+  }
+
+  @HostListener('document:pointerdown')
+  unlockNotificationSound() {
+    if (!this.notificationSettings.sound || this.notificationSoundUnlocked) return;
+    const AudioContextConstructor = window.AudioContext;
+    if (!AudioContextConstructor) return;
+
+    this.notificationAudio ||= new AudioContextConstructor();
+    this.notificationAudio.resume().then(() => {
+      this.notificationSoundUnlocked = true;
+    }).catch(() => {
+      this.notificationSoundUnlocked = false;
+    });
+  }
+
+  @HostListener('document:visibilitychange')
+  onNotificationVisibilityChange() {
+    if (document.visibilityState === 'visible' && this.token) this.loadNotificationFeed();
   }
 
   // ADMIN CHECK
@@ -140,6 +214,184 @@ export class AppComponent {
     }, 4500);
   }
 
+  private loadNotificationPreferences() {
+    const preferences = this.user?.notificationPreferences || {};
+    this.notificationSettings = {
+      attendanceReminder: preferences.attendanceReminder ?? true,
+      leaveUpdates: preferences.leaveUpdates ?? true,
+      announcements: preferences.announcements ?? true,
+      push: preferences.push ?? true,
+      sound: preferences.sound ?? true
+    };
+  }
+
+  private showNotificationBubble(item: any) {
+    this.notificationBubble = item;
+    if (this.notificationBubbleTimer) clearTimeout(this.notificationBubbleTimer);
+    this.notificationBubbleTimer = setTimeout(() => {
+      this.notificationBubble = null;
+      this.notificationBubbleTimer = null;
+    }, 9000);
+  }
+
+  dismissNotificationBubble() {
+    this.notificationBubble = null;
+    if (this.notificationBubbleTimer) clearTimeout(this.notificationBubbleTimer);
+    this.notificationBubbleTimer = null;
+  }
+
+  private startNotificationPolling() {
+    if (this.notificationPolling) clearInterval(this.notificationPolling);
+    if (!this.token || this.user?.mustChangePassword) return;
+    this.notificationFeedInitialized = false;
+    this.loadNotificationFeed();
+    this.notificationPolling = setInterval(() => {
+      if (document.visibilityState === 'visible') this.loadNotificationFeed();
+    }, 25000);
+  }
+
+  loadNotificationFeed() {
+    if (!this.token) return;
+    this.http.get<any>(`${this.api}/notifications`, this.headers).subscribe({
+      next: response => {
+        const rows = response.notifications || [];
+        const currentIds = new Set<string>(rows.map((row: any) => String(row._id)));
+        const newNotifications = this.notificationFeedInitialized
+          ? rows.filter((row: any) => !this.notificationIds.has(String(row._id)))
+          : [];
+        this.notifications = rows;
+        this.unreadNotifications = response.unreadCount || 0;
+        this.notificationIds = currentIds;
+        if (newNotifications.length) {
+          this.showNotificationBubble(newNotifications[0]);
+          if (this.notificationSettings.sound) this.playNotificationSound();
+        }
+        this.notificationFeedInitialized = true;
+      },
+      error: error => console.error('Notification feed:', error)
+    });
+  }
+
+  openNotification(item: any) {
+    if (!item.readAt) {
+      this.http.patch(`${this.api}/notifications/${item._id}/read`, {}, this.headers).subscribe();
+      item.readAt = new Date();
+      this.unreadNotifications = Math.max(this.unreadNotifications - 1, 0);
+    }
+    const targetPage = String(item.link || '').replace(/^\//, '');
+    if (targetPage) this.changePage(targetPage);
+  }
+
+  markAllNotificationsRead() {
+    this.http.patch(`${this.api}/notifications/read-all`, {}, this.headers).subscribe({
+      next: () => {
+        this.notifications = this.notifications.map(item => ({ ...item, readAt: item.readAt || new Date() }));
+        this.unreadNotifications = 0;
+      },
+      error: error => this.notify(error.error?.message || 'Could not update notifications.', true)
+    });
+  }
+
+  private decodeVapidKey(value: string): Uint8Array {
+    const padded = value + '='.repeat((4 - value.length % 4) % 4);
+    const raw = window.atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(Array.from(raw, character => character.charCodeAt(0)));
+  }
+
+  async enableDeviceNotifications() {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+        this.notify('This browser does not support device notifications.', true);
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        this.notify('Allow notifications in your browser settings to receive device alerts.', true);
+        return;
+      }
+
+      const publicKey = environment.vapidPublicKey;
+      if (!publicKey) {
+        this.notify('Device push notifications are not configured on the server yet.', true);
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register('/notifications-sw.js');
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: this.decodeVapidKey(publicKey) as BufferSource
+        });
+      }
+      const response = await firstValueFrom(this.http.post<any>(`${this.api}/notifications/push/subscription`, subscription.toJSON(), this.headers));
+      this.notificationPushConfigured = true;
+      this.notificationSettings.push = true;
+      this.user.notificationPreferences = response.notificationPreferences;
+      localStorage.setItem('attendify_user', JSON.stringify(this.user));
+      this.notify('This device can now receive Attendify notifications.');
+    } catch (error: any) {
+      this.notify(error.error?.message || error.message || 'Could not enable device notifications.', true);
+    }
+  }
+
+  async disableDeviceNotifications() {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration('/');
+      const subscription = await registration?.pushManager.getSubscription();
+      let response: any = { pushEnabled: false };
+      if (subscription) {
+        response = await firstValueFrom(this.http.request<any>('delete', `${this.api}/notifications/push/subscription`, {
+          ...this.headers,
+          body: { endpoint: subscription.endpoint }
+        }));
+        await subscription.unsubscribe();
+      }
+      this.notificationPushConfigured = false;
+      this.notificationSettings.push = response.pushEnabled;
+      this.notify('Device notifications disabled.');
+    } catch (error: any) {
+      this.notify(error.error?.message || 'Could not disable device notifications.', true);
+    }
+  }
+
+  async enableNotificationSound() {
+    try {
+      const AudioContextConstructor = window.AudioContext;
+      if (AudioContextConstructor) {
+        this.notificationAudio ||= new AudioContextConstructor();
+        await this.notificationAudio.resume();
+        this.notificationSoundUnlocked = true;
+        this.notificationSettings.sound = true;
+        this.playNotificationSound();
+        this.http.patch<any>(`${this.api}/auth/notifications`, { sound: true }, this.headers).subscribe({
+          next: response => {
+            this.user.notificationPreferences = response.notificationPreferences;
+            localStorage.setItem('attendify_user', JSON.stringify(this.user));
+          },
+          error: error => this.notify(error.error?.message || 'Could not save the sound preference.', true)
+        });
+      }
+    } catch {
+      this.notify('Sound alerts are not supported by this browser.', true);
+    }
+  }
+
+  private playNotificationSound() {
+    if (!this.notificationSoundUnlocked || !this.notificationAudio) return;
+    const oscillator = this.notificationAudio.createOscillator();
+    const gain = this.notificationAudio.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, this.notificationAudio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.16, this.notificationAudio.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, this.notificationAudio.currentTime + 0.35);
+    oscillator.connect(gain);
+    gain.connect(this.notificationAudio.destination);
+    oscillator.start();
+    oscillator.stop(this.notificationAudio.currentTime + 0.36);
+  }
+
   // LOGIN
   login() {
     this.busy = true;
@@ -149,38 +401,13 @@ export class AppComponent {
       this.loginForm
     ).subscribe({
       next: r => {
-        this.token = r.token;
-        this.user = r.user;
-
-        localStorage.setItem('attendify_token', this.token);
-        localStorage.setItem(
-          'attendify_user',
-          JSON.stringify(this.user)
-        );
-
-        this.profileForm = {
-          phone: this.user.phone || '',
-          address: this.user.address || ''
-        };
-
-        this.notificationSettings = {
-          attendanceReminder:
-            this.user.notificationPreferences?.attendanceReminder ?? true,
-          leaveUpdates:
-            this.user.notificationPreferences?.leaveUpdates ?? true,
-          announcements:
-            this.user.notificationPreferences?.announcements ?? true
-        };
-
-        this.busy = false;
-
-        if (this.user.mustChangePassword) {
-          this.page = 'settings';
-          this.notify('Please change your temporary password first.');
-        } else {
-          this.page = 'dashboard';
-          this.loadData();
+        if (r.mfaRequired) {
+          this.mfaRequired = true;
+          this.mfaChallengeToken = r.challengeToken;
+          this.busy = false;
+          return;
         }
+        this.finishLogin(r);
       },
       error: e => {
         this.busy = false;
@@ -192,14 +419,59 @@ export class AppComponent {
     });
   }
 
+  verifyAdminMfaLogin() {
+    this.busy = true;
+    this.http.post<any>(`${this.api}/auth/login/verify-mfa`, {
+      challengeToken: this.mfaChallengeToken,
+      code: this.mfaCode
+    }).subscribe({
+      next: response => {
+        this.mfaRequired = false;
+        this.mfaChallengeToken = '';
+        this.mfaCode = '';
+        this.finishLogin(response);
+      },
+      error: error => {
+        this.busy = false;
+        this.notify(error.error?.message || 'Two-factor verification failed.', true);
+      }
+    });
+  }
+
+  private finishLogin(response: any) {
+    this.token = response.token;
+    this.user = response.user;
+    localStorage.setItem('attendify_token', this.token);
+    localStorage.setItem('attendify_user', JSON.stringify(this.user));
+    this.profileForm = { phone: this.user.phone || '', address: this.user.address || '' };
+    this.notificationSettings = {
+      attendanceReminder: this.user.notificationPreferences?.attendanceReminder ?? true,
+      leaveUpdates: this.user.notificationPreferences?.leaveUpdates ?? true,
+      announcements: this.user.notificationPreferences?.announcements ?? true,
+      push: this.user.notificationPreferences?.push ?? true,
+      sound: this.user.notificationPreferences?.sound ?? true
+    };
+    this.busy = false;
+    this.notificationIds.clear();
+    this.loadData();
+    this.startNotificationPolling();
+    this.page = this.user.mustChangePassword ? 'settings' : 'dashboard';
+    if (this.user.mustChangePassword) this.notify('Please change your temporary password first.');
+  }
+
   // LOGOUT
   logout() {
+    if (this.notificationPolling) clearInterval(this.notificationPolling);
+    this.notificationPolling = null;
     localStorage.removeItem('attendify_token');
     localStorage.removeItem('attendify_user');
 
     this.token = '';
     this.user = null;
     this.page = 'dashboard';
+    this.notifications = [];
+    this.unreadNotifications = 0;
+    this.notificationIds.clear();
 
     this.todayAttendance = null;
     this.attendance = [];
@@ -209,7 +481,7 @@ export class AppComponent {
 
   // LOAD DATA
   loadData() {
-    if (!this.token || !this.user) return;
+    if (!this.token || !this.user || this.user.mustChangePassword) return;
 
     if (this.isAdmin) {
       this.loadAdmin();
@@ -259,6 +531,11 @@ export class AppComponent {
       },
       error: e => console.error('Leave balance:', e)
     });
+
+    this.http.get<any[]>(`${this.api}/attendance-corrections/mine`, this.headers).subscribe({
+      next: rows => this.attendanceCorrections = rows || [],
+      error: error => console.error('Attendance corrections:', error)
+    });
   }
 
   // ADMIN DATA
@@ -307,6 +584,11 @@ export class AppComponent {
       },
       error: e => console.error('Admin leaves:', e)
     });
+
+    this.http.get<any[]>(`${this.api}/attendance-corrections/admin/all`, this.headers).subscribe({
+      next: rows => this.adminCorrections = rows || [],
+      error: error => console.error('Admin corrections:', error)
+    });
   }
 
   // PAGE NAVIGATION
@@ -328,6 +610,10 @@ export class AppComponent {
 
     this.page = page;
 
+    if (page === 'notifications') this.loadNotificationFeed();
+    if (page === 'audit') this.loadAuditEvents();
+    if (page === 'reports') this.loadReports();
+
     if (page === 'settings' && !this.isAdmin) {
       this.profileForm = {
         phone: this.user.phone || '',
@@ -339,8 +625,9 @@ export class AppComponent {
           this.user.notificationPreferences?.attendanceReminder ?? true,
         leaveUpdates:
           this.user.notificationPreferences?.leaveUpdates ?? true,
-        announcements:
-          this.user.notificationPreferences?.announcements ?? true
+        announcements: this.user.notificationPreferences?.announcements ?? true,
+        push: this.user.notificationPreferences?.push ?? true,
+        sound: this.user.notificationPreferences?.sound ?? true
       };
     }
 
@@ -349,6 +636,114 @@ export class AppComponent {
     } else {
       this.loadEmployee();
     }
+  }
+
+  submitAttendanceCorrection() {
+    this.http.post<any>(`${this.api}/attendance-corrections`, this.correctionForm, this.headers).subscribe({
+      next: () => {
+        this.correctionForm = { dateKey: '', requestedCheckIn: '', requestedCheckOut: '', reason: '' };
+        this.notify('Attendance correction sent to HR for review.');
+        this.loadEmployee();
+      },
+      error: error => this.notify(error.error?.message || 'Could not submit the correction request.', true)
+    });
+  }
+
+  reviewAttendanceCorrection(id: string, status: 'approved' | 'rejected') {
+    const adminRemark = window.prompt(`Optional HR note for ${status}:`) || '';
+    this.http.patch(`${this.api}/attendance-corrections/admin/${id}/review`, { status, adminRemark }, this.headers).subscribe({
+      next: () => {
+        this.notify(`Attendance correction ${status}.`);
+        this.loadAdmin();
+      },
+      error: error => this.notify(error.error?.message || 'Could not review the correction.', true)
+    });
+  }
+
+  loadAuditEvents() {
+    this.http.get<any>(`${this.api}/audit`, this.headers).subscribe({
+      next: response => {
+        this.auditEvents = response.events || [];
+        this.auditTotal = response.total || 0;
+      },
+      error: error => this.notify(error.error?.message || 'Could not load the audit log.', true)
+    });
+  }
+
+  async loadReports() {
+    try {
+      const params = new HttpParams().set('from', this.reportStart).set('to', this.reportEnd);
+      const [attendance, leaves] = await Promise.all([
+        firstValueFrom(this.http.get<any>(`${this.api}/reports/attendance`, { ...this.headers, params })),
+        firstValueFrom(this.http.get<any>(`${this.api}/reports/leaves`, { ...this.headers, params }))
+      ]);
+      this.reportAttendance = attendance.records || [];
+      this.reportLeaves = leaves.records || [];
+      this.reportSummary = { attendance: attendance.summary || {}, leaves: leaves.summary || {} };
+    } catch (error: any) {
+      this.notify(error.error?.message || 'Could not load reports. Choose a valid date range.', true);
+    }
+  }
+
+  sendAnnouncement() {
+    this.http.post<any>(`${this.api}/notifications/announcements`, this.announcementForm, this.headers).subscribe({
+      next: response => {
+        this.notify(response.message || 'Announcement sent.');
+        this.announcementForm = { title: '', message: '' };
+      },
+      error: error => this.notify(error.error?.message || 'Announcement could not be sent.', true)
+    });
+  }
+
+  async setupAdminMfa() {
+    try {
+      const response = await firstValueFrom(this.http.post<any>(`${this.api}/auth/admin/mfa/setup`, {
+        password: this.mfaSetupPassword,
+        code: this.mfaCurrentCode
+      }, this.headers));
+      this.mfaSetupSecret = response.secret;
+      this.mfaQrCode = await QRCode.toDataURL(response.otpauthUrl, { width: 220, margin: 2 });
+      this.notify('Scan the QR code with an authenticator app, then enter its current code.');
+    } catch (error: any) {
+      this.notify(error.error?.message || 'Could not start authenticator setup.', true);
+    }
+  }
+
+  enableAdminMfa() {
+    this.http.post<any>(`${this.api}/auth/admin/mfa/enable`, { code: this.mfaSetupCode }, this.headers).subscribe({
+      next: response => {
+        this.user = response.user;
+        localStorage.setItem('attendify_user', JSON.stringify(this.user));
+        this.mfaSetupSecret = '';
+        this.mfaQrCode = '';
+        this.mfaSetupCode = '';
+        this.mfaSetupPassword = '';
+        this.mfaCurrentCode = '';
+        this.mfaRecoveryCodes = response.recoveryCodes || [];
+        this.replacingAdminMfa = false;
+        this.notify('Two-factor authentication enabled for admin sign-in.');
+      },
+      error: error => this.notify(error.error?.message || 'Could not enable two-factor authentication.', true)
+    });
+  }
+
+  disableAdminMfa() {
+    this.http.post<any>(`${this.api}/auth/admin/mfa/disable`, {
+      password: this.mfaSetupPassword,
+      code: this.mfaSetupCode
+    }, this.headers).subscribe({
+      next: response => {
+        this.token = response.token;
+        localStorage.setItem('attendify_token', this.token);
+        this.user.adminMfaEnabled = false;
+        localStorage.setItem('attendify_user', JSON.stringify(this.user));
+        this.mfaSetupPassword = '';
+        this.mfaCurrentCode = '';
+        this.mfaSetupCode = '';
+        this.notify(response.message || 'Two-factor authentication disabled.');
+      },
+      error: error => this.notify(error.error?.message || 'Could not disable two-factor authentication.', true)
+    });
   }
 
   // SELECT ATTENDANCE PHOTO
@@ -399,10 +794,6 @@ export class AppComponent {
 
           this.error = '';
           this.message = '';
-
-          console.log('Latitude:', this.latitude);
-          console.log('Longitude:', this.longitude);
-          console.log('Accuracy:', this.accuracy);
 
           resolve();
         },
@@ -919,6 +1310,10 @@ export class AppComponent {
     ).length;
   }
 
+  get pendingCorrections() {
+    return this.adminCorrections.filter(request => request.status === 'pending').length;
+  }
+
   // EMPLOYEE PENDING LEAVES
   get pendingEmployeeLeaves() {
     return this.leaves.filter(
@@ -1017,11 +1412,12 @@ export class AppComponent {
         };
 
         this.busy = false;
-        this.page = 'dashboard';
+        this.page = this.isAdmin ? 'settings' : 'dashboard';
 
         this.notify('Password changed successfully.');
 
-        this.loadEmployee();
+        this.loadData();
+        this.startNotificationPolling();
       },
       error: e => {
         this.busy = false;
@@ -1042,9 +1438,7 @@ export class AppComponent {
       this.headers
     ).subscribe({
       next: r => {
-        this.user.notificationPreferences =
-          r.notificationPreferences ||
-          r.user?.notificationPreferences;
+        this.user.notificationPreferences = r.notificationPreferences || r.user?.notificationPreferences;
 
         localStorage.setItem(
           'attendify_user',
@@ -1052,6 +1446,11 @@ export class AppComponent {
         );
 
         this.notify('Notification settings saved.');
+        if (!this.notificationSettings.sound && this.notificationAudio) {
+          this.notificationAudio.close();
+          this.notificationAudio = null;
+          this.notificationSoundUnlocked = false;
+        }
       },
       error: e => {
         this.notify(

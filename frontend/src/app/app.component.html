@@ -22,7 +22,7 @@
       <div class="eyebrow">WELCOME BACK</div>
       <h2>Sign in to your account</h2>
       <p class="muted">Enter your details to access your workspace.</p>
-      <form (ngSubmit)="login()"><label>Email address</label>
+      <form *ngIf="!mfaRequired" (ngSubmit)="login()"><label>Email address</label>
         <div class="input-wrap"><i class="fa-regular fa-envelope"></i><input type="email" name="email"
             [(ngModel)]="loginForm.email" placeholder="name@company.com" required></div><label>Password</label>
         <div class="input-wrap"><i class="fa-solid fa-lock"></i><input type="password" name="password"
@@ -30,6 +30,18 @@
           class="primary-btn w-100" [disabled]="busy">{{busy?'Signing in...':'Sign in'}} <i
             class="fa-solid fa-arrow-right"></i></button>
       </form>
+          <form *ngIf="mfaRequired" (ngSubmit)="verifyAdminMfaLogin()">
+            <p class="muted">Enter your authenticator code or an unused recovery code to finish admin sign-in.</p>
+            <label for="admin-mfa-code">Authenticator / recovery code</label>
+              <div class="input-wrap"><i class="fa-solid fa-shield-halved"></i><input id="admin-mfa-code" type="text"
+            name="mfaCode" [(ngModel)]="mfaCode" inputmode="numeric" autocomplete="one-time-code"
+                maxlength="16" placeholder="Enter your code" required></div>
+            <button class="primary-btn w-100" [disabled]="busy">{{busy?'Verifying...':'Verify code'}} <i
+            class="fa-solid fa-arrow-right"></i></button>
+          </form>
+          <button *ngIf="mfaRequired" type="button" class="text-btn mt-3" (click)="mfaRequired = false; mfaChallengeToken = ''">
+            Back to password sign in
+          </button>
 
       <!-- <div class="demo-box"><b>Demo accounts</b>
         <div>Admin: admin@attendify.local / Admin@12345</div>
@@ -47,6 +59,9 @@
     <div class="workspace-label">WORKSPACE</div>
     <button class="nav-link" [class.active]="page==='dashboard'" (click)="changePage('dashboard')"><i
         class="fa-solid fa-grip"></i> Dashboard</button>
+    <button class="nav-link" [class.active]="page==='notifications'" (click)="changePage('notifications')">
+      <i class="fa-regular fa-bell"></i> Notifications <span class="nav-count" *ngIf="unreadNotifications">{{unreadNotifications}}</span>
+    </button>
     <ng-container *ngIf="!isAdmin">
       <div class="workspace-label mt-4">MY WORK</div><button class="nav-link" [class.active]="page==='attendance'"
         (click)="changePage('attendance')"><i class="fa-regular fa-clock"></i> Attendance</button><button
@@ -54,6 +69,10 @@
           class="fa-regular fa-calendar"></i> My Leaves</button><button class="nav-link"
         [class.active]="page==='history'" (click)="changePage('history')"><i class="fa-solid fa-list-check"></i>
         Attendance History</button>
+      <button class="nav-link" [class.active]="page==='corrections'" (click)="changePage('corrections')">
+        <i class="fa-solid fa-pen-to-square"></i> Attendance Corrections</button>
+      <button class="nav-link" [class.active]="page==='settings'" (click)="changePage('settings')">
+        <i class="fa-solid fa-gear"></i> Settings</button>
     </ng-container>
     <ng-container *ngIf="isAdmin">
       <div class="workspace-label mt-4">MANAGEMENT</div><button class="nav-link" [class.active]="page==='employees'"
@@ -63,6 +82,14 @@
         [class.active]="page==='admin-leaves'" (click)="changePage('admin-leaves')"><i
           class="fa-regular fa-envelope"></i> Leave Requests <span class="nav-count"
           *ngIf="pendingLeaves">{{pendingLeaves}}</span></button>
+      <button class="nav-link" [class.active]="page==='corrections'" (click)="changePage('corrections')">
+        <i class="fa-solid fa-pen-to-square"></i> Corrections <span class="nav-count" *ngIf="pendingCorrections">{{pendingCorrections}}</span></button>
+      <button class="nav-link" [class.active]="page==='reports'" (click)="changePage('reports')">
+        <i class="fa-solid fa-chart-column"></i> Reports</button>
+      <button class="nav-link" [class.active]="page==='audit'" (click)="changePage('audit')">
+        <i class="fa-solid fa-shield-halved"></i> Audit Log</button>
+      <button class="nav-link" [class.active]="page==='settings'" (click)="changePage('settings')">
+        <i class="fa-solid fa-gear"></i> Settings</button>
     </ng-container>
     <div class="sidebar-bottom">
       <div class="help-card"><i class="fa-regular fa-circle-question"></i><b>Need a hand?</b><small>Reach out to your HR
@@ -85,6 +112,10 @@
       </div>
       <div class="top-actions">
         <div class="today-pill"><i class="fa-regular fa-calendar"></i> {{currentDate | date:'EEE, dd MMM yyyy'}}</div>
+        <button type="button" class="topbar-notification-button" (click)="changePage('notifications')"
+          [attr.aria-label]="unreadNotifications ? unreadNotifications + ' unread notifications' : 'Notifications'">
+          <i class="fa-regular fa-bell"></i><span class="topbar-notification-count" *ngIf="unreadNotifications">{{unreadNotifications}}</span>
+        </button>
         <div class="user-chip">
           <div class="avatar">{{user.name?.charAt(0)}}</div>
           <div><b>{{user.name}}</b><small>{{isAdmin?'Administrator':(user.designation||'Employee')}}</small></div><span
@@ -234,8 +265,9 @@
               </div>
               <span class="secure-label"><i class="fa-solid fa-shield-halved"></i> Secure</span>
             </div>
-            <label class="upload-zone"><input type="file" accept="image/jpeg,image/png,image/webp" capture="user"
-                (change)="onPhoto($event)"><img *ngIf="selectedPreview" [src]="selectedPreview">
+            <label class="upload-zone">
+              <input type="file" accept="image/jpeg,image/png,image/webp" capture="user" (change)="onPhoto($event)">
+                <img *ngIf="selectedPreview" [src]="selectedPreview">
               <div *ngIf="!selectedPreview">
                 <div class="upload-icon"><i class="fa-solid fa-camera"></i></div><b>Take a selfie or upload a
                   photo</b><small>JPG, PNG or WEBP · Max 5 MB</small><span class="upload-cta">Choose photo</span>
@@ -521,8 +553,8 @@
               <label>Email</label>
               <input class="form-control" type="email" name="email"
                 [(ngModel)]="employeeForm.email" required>
-                <label>Temporary password</label><input class="form-control"
-                name="password" [(ngModel)]="employeeForm.password" required>
+                <label>Temporary password (12+ characters)</label><input class="form-control" type="password"
+                name="password" [(ngModel)]="employeeForm.password" minlength="12" required>
               <div class="form-row">
                 <div>
                   <label>Department</label>
@@ -610,10 +642,9 @@
                   <td>{{row.checkIn|date:'hh:mm a'}}</td>
                   <td>{{row.checkOut?(row.checkOut|date:'hh:mm a'):'—'}}</td>
                   <td>{{row.status}}</td>
-                  <td><a *ngIf="row.location" [href]="mapUrl(row.location.latitude,row.location.longitude)"
-                      target="_blank">Open map <i class="fa-solid fa-arrow-up-right-from-square"></i></a></td>
-                  <td><button class="text-btn" (click)="viewPhoto(row.photo)">View photo <i
-                        class="fa-regular fa-image"></i></button></td>
+                  <td><a *ngIf="row.location" [href]="mapUrl(row.location.latitude,row.location.longitude)" target="_blank">Open map <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a></td>
+                  <td><button class="text-btn" (click)="viewPhoto(row.photo)">View photo <i class="fa-regular fa-image"></i></button></td>
                 </tr>
                 <tr *ngIf="!adminAttendance.length">
                   <td colspan="8" class="empty-state">No attendance records found.</td>
@@ -676,6 +707,161 @@
               </tbody>
             </table>
           </div>
+        </section>
+      </ng-container>
+
+      <ng-container *ngIf="page==='notifications'">
+        <section class="panel notification-center">
+          <div class="panel-head">
+            <div><h3>Notification center</h3><p>Important updates for your Attendify account.</p></div>
+            <button type="button" class="outline-btn" (click)="markAllNotificationsRead()" [disabled]="!unreadNotifications">
+              Mark all read <span *ngIf="unreadNotifications">({{unreadNotifications}})</span>
+            </button>
+          </div>
+          <div class="notification-list" *ngIf="notifications.length; else noNotifications">
+            <button type="button" class="notification-item" *ngFor="let item of notifications"
+              [class.unread]="!item.readAt" (click)="openNotification(item)">
+              <span class="notification-item-icon"><i class="fa-regular fa-bell"></i></span>
+              <span class="notification-item-copy"><b>{{item.title}}</b><span>{{item.message}}</span>
+                <small>{{item.createdAt | date:'medium'}}</small></span>
+              <span class="unread-indicator" *ngIf="!item.readAt" aria-label="Unread"></span>
+            </button>
+          </div>
+          <ng-template #noNotifications><div class="empty-state">You're all caught up. New updates will appear here.</div></ng-template>
+        </section>
+      </ng-container>
+
+      <ng-container *ngIf="page==='corrections' && !isAdmin">
+        <div class="page-intro"><div><h3>Attendance correction</h3><p>Ask HR to correct a missed or inaccurate attendance time.</p></div></div>
+        <div class="two-col">
+          <section class="panel">
+            <h3>New correction request</h3>
+            <p class="muted">Choose a date with an existing attendance record. HR approval is required.</p>
+            <form (ngSubmit)="submitAttendanceCorrection()">
+              <label>Attendance date</label><input class="form-control" type="date" name="correctionDate"
+                [(ngModel)]="correctionForm.dateKey" required>
+              <div class="form-row">
+                <div><label>Requested check-in</label><input class="form-control" type="datetime-local" name="requestedCheckIn"
+                    [(ngModel)]="correctionForm.requestedCheckIn"></div>
+                <div><label>Requested check-out</label><input class="form-control" type="datetime-local" name="requestedCheckOut"
+                    [(ngModel)]="correctionForm.requestedCheckOut"></div>
+              </div>
+              <label>Reason</label><textarea class="form-control" rows="4" maxlength="1000" name="correctionReason"
+                [(ngModel)]="correctionForm.reason" placeholder="Explain what needs to be corrected" required></textarea>
+              <button class="primary-btn mt-3" type="submit">Send to HR <i class="fa-solid fa-arrow-right"></i></button>
+            </form>
+          </section>
+          <section class="panel"><h3>Request history</h3>
+            <div class="table-responsive"><table class="table modern-table">
+              <thead><tr><th>DATE</th><th>REQUESTED TIMES</th><th>STATUS</th><th>HR NOTE</th></tr></thead>
+              <tbody><tr *ngFor="let request of attendanceCorrections">
+                <td>{{request.dateKey}}</td>
+                <td>{{request.requestedCheckIn?(request.requestedCheckIn | date:'shortTime'):'—'}} / {{request.requestedCheckOut?(request.requestedCheckOut | date:'shortTime'):'—'}}</td>
+                <td><span class="table-status" [class.pending]="request.status==='pending'" [class.rejected]="request.status==='rejected'">{{request.status}}</span></td>
+                <td>{{request.adminRemark || '—'}}</td>
+              </tr><tr *ngIf="!attendanceCorrections.length"><td colspan="4" class="empty-state">No correction requests yet.</td></tr></tbody>
+            </table></div>
+          </section>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="page==='corrections' && isAdmin">
+        <section class="panel">
+          <div class="panel-head"><div><h3>Attendance correction requests</h3><p>Review requested changes before they are applied to attendance records.</p></div></div>
+          <div class="table-responsive"><table class="table modern-table">
+            <thead><tr><th>EMPLOYEE</th><th>DATE</th><th>REQUESTED CHECK-IN</th><th>REQUESTED CHECK-OUT</th><th>REASON</th><th>STATUS</th><th>ACTION</th></tr></thead>
+            <tbody><tr *ngFor="let request of adminCorrections">
+              <td><b>{{request.employee?.name}}</b><small class="sub-cell">{{request.employee?.employeeId}}</small></td>
+              <td>{{request.dateKey}}</td><td>{{request.requestedCheckIn?(request.requestedCheckIn | date:'shortTime'):'—'}}</td>
+              <td>{{request.requestedCheckOut?(request.requestedCheckOut | date:'shortTime'):'—'}}</td><td>{{request.reason}}</td>
+              <td><span class="table-status" [class.pending]="request.status==='pending'" [class.rejected]="request.status==='rejected'">{{request.status}}</span></td>
+              <td><div class="action-buttons" *ngIf="request.status==='pending'"><button class="approve-btn" aria-label="Approve correction" (click)="reviewAttendanceCorrection(request._id,'approved')"><i class="fa-solid fa-check"></i></button>
+                <button class="reject-btn" aria-label="Reject correction" (click)="reviewAttendanceCorrection(request._id,'rejected')"><i class="fa-solid fa-xmark"></i></button></div><span class="muted" *ngIf="request.status!=='pending'">Reviewed</span></td>
+            </tr><tr *ngIf="!adminCorrections.length"><td colspan="7" class="empty-state">No correction requests found.</td></tr></tbody>
+          </table></div>
+        </section>
+      </ng-container>
+
+      <ng-container *ngIf="page==='audit' && isAdmin">
+        <section class="panel">
+          <div class="panel-head"><div><h3>Security & activity audit</h3><p>{{auditTotal}} recorded administrative and account events.</p></div>
+            <button class="outline-btn" type="button" (click)="loadAuditEvents()"><i class="fa-solid fa-rotate"></i> Refresh</button></div>
+          <div class="table-responsive"><table class="table modern-table">
+            <thead><tr><th>WHEN</th><th>ACTOR</th><th>ACTION</th><th>RECORD</th><th>DETAILS</th></tr></thead>
+            <tbody><tr *ngFor="let event of auditEvents"><td>{{event.createdAt | date:'medium'}}</td><td>{{event.actorName}}</td>
+              <td><span class="table-status">{{event.action}}</span></td><td>{{event.entityType}} {{event.entityId}}</td><td>{{event.summary}}</td>
+            </tr><tr *ngIf="!auditEvents.length"><td colspan="5" class="empty-state">No audit events have been recorded yet.</td></tr></tbody>
+          </table></div>
+        </section>
+      </ng-container>
+
+      <ng-container *ngIf="page==='reports' && isAdmin">
+        <section class="panel">
+          <div class="panel-head"><div><h3>Workforce reports</h3><p>Review attendance and leave activity for a date range (up to 366 days).</p></div></div>
+          <div class="report-filters"><div><label>From</label><input class="form-control" type="date" name="reportStart" [(ngModel)]="reportStart"></div>
+            <div><label>To</label><input class="form-control" type="date" name="reportEnd" [(ngModel)]="reportEnd"></div>
+            <button class="primary-btn" type="button" (click)="loadReports()"><i class="fa-solid fa-filter"></i> Apply range</button></div>
+          <div class="stats-grid report-stats">
+            <div class="stat-card"><small>Attendance records</small><h3>{{reportSummary.attendance.total || 0}}</h3><span class="stat-note">{{reportSummary.attendance.late || 0}} late</span></div>
+            <div class="stat-card"><small>Leave requests</small><h3>{{reportSummary.leaves.total || 0}}</h3><span class="stat-note">{{reportSummary.leaves.pending || 0}} pending</span></div>
+            <div class="stat-card"><small>Approved leave</small><h3>{{reportSummary.leaves.approved || 0}}</h3><span class="stat-note">Requests overlapping range</span></div>
+          </div>
+          <div class="report-export-actions"><button class="outline-btn" type="button" (click)="exportCsv('attendance-report.csv',reportAttendance,['employee.name','employee.employeeId','employee.department','dateKey','checkIn','checkOut','status'])"><i class="fa-solid fa-download"></i> Export attendance CSV</button>
+            <button class="outline-btn" type="button" (click)="exportCsv('leave-report.csv',reportLeaves,['employee.name','employee.employeeId','type','startDate','endDate','days','status','reason','adminRemark'])"><i class="fa-solid fa-download"></i> Export leave CSV</button></div>
+        </section>
+      </ng-container>
+
+      <ng-container *ngIf="page==='settings' && isAdmin">
+        <div class="page-intro"><div><h3>Admin security & notifications</h3><p>Protect administrator access and configure device alerts.</p></div></div>
+        <div class="two-col">
+          <section class="panel"><div class="panel-head"><div><h3><i class="fa-solid fa-shield-halved"></i> Two-factor authentication</h3>
+            <p>{{user.adminMfaEnabled?'Authenticator protection is enabled.':'Add an authenticator app to secure admin sign-in.'}}</p></div></div>
+            <div *ngIf="!user.adminMfaEnabled">
+              <div class="form-row"><div><label>Current password</label><input class="form-control" type="password" name="mfaSetupPassword" [(ngModel)]="mfaSetupPassword"></div>
+                <button class="primary-btn align-self-end" type="button" (click)="setupAdminMfa()">Start setup</button></div>
+              <div class="mfa-setup" *ngIf="mfaQrCode"><img [src]="mfaQrCode" alt="Authenticator setup QR code"><p>Scan using your authenticator app. Or enter this setup key: <b>{{mfaSetupSecret}}</b></p>
+                <label>6-digit code</label><input class="form-control" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" name="mfaSetupCode" [(ngModel)]="mfaSetupCode">
+                <button class="primary-btn mt-3" type="button" (click)="enableAdminMfa()">Confirm and enable MFA</button></div>
+            </div>
+            <div *ngIf="user.adminMfaEnabled"><div class="form-row"><div><label>Current password</label><input class="form-control" type="password" name="mfaDisablePassword" [(ngModel)]="mfaSetupPassword"></div>
+              <div><label>Authenticator code</label><input class="form-control" type="text" inputmode="numeric" maxlength="6" name="mfaDisableCode" [(ngModel)]="mfaSetupCode"></div></div>
+              <button class="outline-btn mt-3" type="button" (click)="disableAdminMfa()">Disable two-factor authentication</button>
+              <button class="outline-btn mt-3 ms-2" type="button" (click)="replacingAdminMfa = !replacingAdminMfa">Replace authenticator app</button>
+              <div class="mfa-setup mt-3" *ngIf="replacingAdminMfa">
+                <label>Current password</label><input class="form-control" type="password" name="mfaReplacePassword" [(ngModel)]="mfaSetupPassword">
+                <label>Current authenticator code</label><input class="form-control" type="text" inputmode="numeric" maxlength="6" name="mfaCurrentCode" [(ngModel)]="mfaCurrentCode">
+                <button class="primary-btn mt-3" type="button" (click)="setupAdminMfa()">Create replacement QR code</button>
+                <div *ngIf="mfaQrCode"><img [src]="mfaQrCode" alt="Replacement authenticator setup QR code"><p>Scan the QR code, then confirm a code from the new authenticator app. Previous recovery codes will be replaced.</p>
+                  <label>New authenticator code</label><input class="form-control" type="text" inputmode="numeric" maxlength="6" name="mfaReplacementCode" [(ngModel)]="mfaSetupCode">
+                  <button class="primary-btn mt-3" type="button" (click)="enableAdminMfa()">Confirm replacement</button></div>
+              </div></div>
+          </section>
+          <section class="panel"><div class="panel-head"><div><h3><i class="fa-regular fa-bell"></i> Organization announcement</h3><p>Send an update to employees who have announcements enabled.</p></div></div>
+            <form (ngSubmit)="sendAnnouncement()"><label>Title</label><input class="form-control" maxlength="120" name="announcementTitle" [(ngModel)]="announcementForm.title" required>
+              <label>Message</label><textarea class="form-control" rows="4" maxlength="500" name="announcementMessage" [(ngModel)]="announcementForm.message" required></textarea>
+              <button class="primary-btn mt-3" type="submit">Send announcement <i class="fa-solid fa-paper-plane"></i></button></form>
+          </section>
+        </div>
+        <section class="panel mt-4" *ngIf="mfaRecoveryCodes.length">
+          <div class="alert-error"><i class="fa-solid fa-triangle-exclamation"></i> Save these recovery codes somewhere safe. Each works once; they cannot be shown again.</div>
+          <div class="recovery-codes"><code *ngFor="let recoveryCode of mfaRecoveryCodes">{{recoveryCode}}</code></div>
+          <button class="outline-btn mt-3" type="button" (click)="mfaRecoveryCodes = []">I saved these codes</button>
+        </section>
+        <section class="panel mt-4">
+          <div class="panel-head"><div><h3><i class="fa-solid fa-key"></i> Change admin password</h3><p>Use a unique password for your administrator account.</p></div></div>
+          <form (ngSubmit)="changePassword()">
+            <label>Current password</label><input class="form-control" type="password" name="adminCurrentPassword" [(ngModel)]="passwordForm.currentPassword" required>
+            <div class="form-row"><div><label>New password</label><input class="form-control" type="password" name="adminNewPassword" [(ngModel)]="passwordForm.newPassword" minlength="12" required></div>
+              <div><label>Confirm new password</label><input class="form-control" type="password" name="adminConfirmPassword" [(ngModel)]="passwordForm.confirmPassword" required></div></div>
+            <button class="primary-btn mt-3" type="submit" [disabled]="busy">Update password</button>
+          </form>
+        </section>
+        <section class="panel mt-4"><h3>Device alerts</h3><p class="muted">Enable notifications on this browser/device. System sound and vibration follow the device's notification settings.</p>
+          <div class="notification-setting"><div><b>Notification sound</b><small>Play a short alert while this app is open. Browser sound requires a user gesture.</small></div>
+            <input type="checkbox" name="adminSound" [(ngModel)]="notificationSettings.sound"></div>
+          <button class="primary-btn" type="button" (click)="enableDeviceNotifications()"><i class="fa-regular fa-bell"></i> Enable on this device</button>
+          <button class="outline-btn ms-2" type="button" (click)="enableNotificationSound()"><i class="fa-solid fa-volume-high"></i> Enable sound while app is open</button>
+          <button class="outline-btn ms-2" type="button" (click)="saveNotifications()"><i class="fa-solid fa-floppy-disk"></i> Save notification settings</button>
         </section>
       </ng-container>
 
@@ -768,7 +954,7 @@
 
               <label>New Password</label>
               <input class="form-control" type="password" name="newPassword" [(ngModel)]="passwordForm.newPassword"
-                placeholder="Minimum 8 characters" minlength="8" required>
+                placeholder="12+ chars: upper, lower, number, symbol" minlength="12" required>
 
               <label>Confirm New Password</label>
               <input class="form-control" type="password" name="confirmPassword"
@@ -825,6 +1011,17 @@
               <small>Receive important company announcements.</small>
             </div>
             <input type="checkbox" name="announcements" [(ngModel)]="notificationSettings.announcements">
+          </div>
+
+          <div class="notification-setting">
+            <div><b>Notification sound</b><small>Play a short alert while Attendify is open. Enable sound once from this device.</small></div>
+            <input type="checkbox" name="sound" [(ngModel)]="notificationSettings.sound">
+          </div>
+
+          <div class="notification-device-actions">
+            <button class="outline-btn" type="button" (click)="enableDeviceNotifications()"><i class="fa-regular fa-bell"></i> Enable notifications on this device</button>
+            <button class="outline-btn" type="button" (click)="disableDeviceNotifications()"><i class="fa-solid fa-bell-slash"></i> Disable on this device</button>
+            <button class="outline-btn" type="button" (click)="enableNotificationSound()"><i class="fa-solid fa-volume-high"></i> Test / enable sound</button>
           </div>
 
           <button class="primary-btn mt-3" (click)="saveNotifications()">
@@ -1045,4 +1242,13 @@
       </footer>
     </div>
   </main>
+  <div class="notification-toast" *ngIf="notificationBubble" role="status" aria-live="polite">
+    <span class="notification-toast-icon"><i class="fa-regular fa-bell"></i></span>
+    <button type="button" class="notification-toast-content" (click)="openNotification(notificationBubble)">
+      <b>{{notificationBubble.title}}</b><span>{{notificationBubble.message}}</span><small>Open notification</small>
+    </button>
+    <button type="button" class="notification-toast-dismiss" (click)="dismissNotificationBubble()" aria-label="Dismiss notification">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
 </div>

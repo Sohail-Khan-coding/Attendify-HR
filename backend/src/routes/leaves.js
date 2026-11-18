@@ -3,6 +3,8 @@ const Leave = require('../models/Leave');
 const User = require('../models/User');
 const { protect, adminOnly } = require('../middleware/auth');
 const { countDays } = require('../utils/dates');
+const { writeAudit } = require('../utils/audit');
+const { notifyRoles, notifyUser } = require('../utils/notifications');
 router.use(protect);
 router.post('/', async (req,res)=>{
   try {
@@ -11,7 +13,10 @@ router.post('/', async (req,res)=>{
     if(new Date(startDate)>new Date(endDate)) return res.status(400).json({message:'End date must be after start date.'});
     const overlap=await Leave.findOne({employee:req.user._id,status:{$in:['pending','approved']},startDate:{$lte:new Date(endDate)},endDate:{$gte:new Date(startDate)}});
     if(overlap) return res.status(409).json({message:'A leave request already exists for these dates.'});
-    const row=await Leave.create({employee:req.user._id,type,startDate,endDate,days,reason}); res.status(201).json(row);
+    const row=await Leave.create({employee:req.user._id,type,startDate,endDate,days,reason});
+    await writeAudit({req,action:'leave.requested',entityType:'leave',entityId:row._id,summary:`Employee submitted a ${type} leave request.`}).catch(error=>console.error('Audit write failed:',error.message));
+    await notifyRoles(['admin'],{title:'Leave request received',message:`${req.user.name} submitted a ${type} leave request.`,category:'leave',link:'/admin-leaves'}).catch(error=>console.error('Notification delivery failed:',error.message));
+    res.status(201).json(row);
   } catch(e){res.status(400).json({message:e.message});}
 });
 router.get('/mine', async(req,res)=>res.json(await Leave.find({employee:req.user._id}).sort({createdAt:-1})));
@@ -29,6 +34,9 @@ router.patch('/admin/:id/review',adminOnly,async(req,res)=>{
     const employee=await User.findById(leave.employee); const used=await Leave.aggregate([{$match:{employee:leave.employee,status:'approved',type:leave.type,startDate:{$gte:new Date(`${new Date().getFullYear()}-01-01`)}}},{$group:{_id:null,total:{$sum:'$days'}}}]);
     const allowance=(employee.leaveAllowance||{})[leave.type]||0; if((used[0]?.total||0)+leave.days>allowance) return res.status(400).json({message:'Insufficient leave balance. Update employee allowance or reject this request.'});
   }
-  leave.status=status; leave.adminRemark=adminRemark||''; leave.reviewedBy=req.user._id; await leave.save(); res.json(leave);
+  leave.status=status; leave.adminRemark=adminRemark||''; leave.reviewedBy=req.user._id; await leave.save();
+  await writeAudit({req,action:`leave.${status}`,entityType:'leave',entityId:leave._id,summary:`Leave request ${status}.`,changes:{status,adminRemark:leave.adminRemark}}).catch(error=>console.error('Audit write failed:',error.message));
+  await notifyUser(leave.employee,{title:`Leave request ${status}`,message:`Your ${leave.type} leave request was ${status}.${leave.adminRemark?` HR: ${leave.adminRemark}`:''}`,category:'leave',link:'/leaves'}).catch(error=>console.error('Notification delivery failed:',error.message));
+  res.json(leave);
 });
 module.exports=router;

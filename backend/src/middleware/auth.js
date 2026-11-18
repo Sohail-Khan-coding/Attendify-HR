@@ -15,12 +15,22 @@ exports.protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    if (decoded.purpose || typeof decoded.tokenVersion !== 'number') {
+      return res.status(401).json({
+        message: 'A full authenticated session is required.'
+      });
+    }
+
     const user = await User.findById(decoded.id);
 
     if (!user || !user.active) {
       return res.status(401).json({
         message: 'Account unavailable.'
       });
+    }
+
+    if (user.mustChangePassword && !(req.method === 'POST' && req.path === '/change-password')) {
+      return res.status(403).json({ message: 'Please change your temporary password before continuing.' });
     }
 
     // Check whether this session has been invalidated

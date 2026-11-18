@@ -3,6 +3,8 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { protect, adminOnly } = require('../middleware/auth');
+const { writeAudit } = require('../utils/audit');
+const { notifyUser } = require('../utils/notifications');
 
 router.use(protect, adminOnly);
 
@@ -34,7 +36,13 @@ router.post('/', async (req, res) => {
       leaveAllowance
     } = req.body;
 
-    const hash = await bcrypt.hash(password || 'Welcome@123', 12);
+    if (!String(name || '').trim() || !String(email || '').trim() || !String(employeeId || '').trim()) {
+      return res.status(400).json({ message: 'Name, email, and employee ID are required.' });
+    }
+    if (!password || String(password).length < 12) {
+      return res.status(400).json({ message: 'Set a temporary password with at least 12 characters.' });
+    }
+    const hash = await bcrypt.hash(password, 12);
 
     const row = await User.create({
       name,
@@ -48,6 +56,9 @@ router.post('/', async (req, res) => {
       leaveAllowance,
       mustChangePassword: true
     });
+
+    await writeAudit({ req, action: 'employee.created', entityType: 'user', entityId: row._id, summary: `Created employee account for ${row.name}.` }).catch(error => console.error('Audit write failed:', error.message));
+    await notifyUser(row._id, { title: 'Your Attendify account is ready', message: 'An HR administrator created your account. Sign in and change your temporary password.', category: 'system', link: '/' }).catch(error => console.error('Notification delivery failed:', error.message));
 
     res.status(201).json({
       id: row._id,
@@ -117,6 +128,7 @@ router.patch('/:id', async (req, res) => {
       update.phone = String(update.phone).trim();
     }
 
+    const previous = await User.findOne({ _id: req.params.id, role: 'employee' }).select('-password');
     const row = await User.findOneAndUpdate(
       {
         _id: req.params.id,
@@ -134,6 +146,13 @@ router.patch('/:id', async (req, res) => {
         message: 'Employee not found.'
       });
     }
+
+    if (previous && previous.active !== row.active) {
+      row.tokenVersion = (row.tokenVersion || 0) + 1;
+      await row.save();
+    }
+
+    await writeAudit({ req, action: 'employee.updated', entityType: 'user', entityId: row._id, summary: `Updated employee profile for ${row.name}.`, changes: { before: previous ? { name: previous.name, email: previous.email, department: previous.department, active: previous.active } : null, after: { name: row.name, email: row.email, department: row.department, active: row.active } } }).catch(error => console.error('Audit write failed:', error.message));
 
     res.json({
       message: 'Employee profile updated successfully.',
@@ -166,6 +185,10 @@ router.delete('/:id', async (req, res) => {
         message: 'Employee not found.'
       });
     }
+
+    row.tokenVersion = (row.tokenVersion || 0) + 1;
+    await row.save();
+    await writeAudit({ req, action: 'employee.deactivated', entityType: 'user', entityId: row._id, summary: `Deactivated employee account for ${row.name}.` }).catch(error => console.error('Audit write failed:', error.message));
 
     res.json({ message: 'Employee deactivated.' });
 

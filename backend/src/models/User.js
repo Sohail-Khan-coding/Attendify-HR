@@ -21,11 +21,18 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+
+  adminMfaEnabled: { type: Boolean, default: false },
+  adminMfaSecret: { type: String, select: false, default: undefined },
+  pendingAdminMfaSecret: { type: String, select: false, default: undefined },
+  adminMfaRecoveryCodes: { type: [String], select: false, default: undefined },
   
   notificationPreferences: {
     attendanceReminder: { type: Boolean, default: true },
     leaveUpdates: { type: Boolean, default: true },
-    announcements: { type: Boolean, default: true }
+    announcements: { type: Boolean, default: true },
+    push: { type: Boolean, default: true },
+    sound: { type: Boolean, default: true }
   }
 }, { timestamps: true });
 module.exports = mongoose.model('User', userSchema);

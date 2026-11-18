@@ -13,6 +13,9 @@
       "build": {
         "builder": "@angular-devkit/build-angular:browser",
         "options": {
+          "allowedCommonJsDependencies": [
+            "qrcode"
+          ],
           "outputPath": "dist/attendify-hr",
           "index": "src/index.html",
           "main": "src/main.ts",
@@ -22,7 +25,17 @@
           "tsConfig": "tsconfig.app.json",
           "inlineStyleLanguage": "css",
           "assets": [
-            "src/assets"
+            "src/assets",
+            {
+              "glob": "notifications-sw.js",
+              "input": "src",
+              "output": "/"
+            },
+            {
+              "glob": "manifest.webmanifest",
+              "input": "src",
+              "output": "/"
+            }
           ],
           "styles": [
             "node_modules/bootstrap/dist/css/bootstrap.min.css",
@@ -32,6 +45,12 @@
         },
         "configurations": {
           "production": {
+            "fileReplacements": [
+              {
+                "replace": "src/environments/environment.ts",
+                "with": "src/environments/environment.prod.ts"
+              }
+            ],
             "budgets": [
               {
                 "type": "initial",
@@ -66,7 +85,6 @@
     }
   }
 },
-"defaultProject": "attendify",
 "cli": {
   "analytics": "944ba938-6ee4-4043-932a-3c49b0dad928"
 }
