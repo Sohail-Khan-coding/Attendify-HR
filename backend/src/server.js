@@ -21,11 +21,5 @@ if (require.main === module) {
 }
 
 module.exports = async (req, res) => {
-	try {
-		await connectDB();
-		return app(req, res);
-	} catch (error) {
-		console.error('Database connection failed:', error.message);
-		return res.status(500).json({ message: 'Database connection failed.' });
-	}
+	return app(req, res);
 };

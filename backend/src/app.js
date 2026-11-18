@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const connectDB = require('./config/db');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -28,13 +29,28 @@ app.use(cors({
       return callback(null, true);
     }
     return callback(new Error('Origin is not allowed by CORS.'));
-  }
+  },
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
+  maxAge: 86400
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
 
 // Uploaded files are deliberately not exposed as a public static directory.
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'Attendify HR API' }));
+
+// Let CORS answer OPTIONS before opening MongoDB; browsers preflight the JSON + Authorization login request.
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/employees', require('./routes/employees'));
